@@ -1,0 +1,14 @@
+{
+  "manifest_version": 3,
+  "name": "Tabora",
+  "description": "Save, search, organize, and restore beautiful tab sessions.",
+  "version": "0.1.0",
+  "permissions": ["tabs", "storage"],
+  "action": {
+    "default_title": "Tabora",
+    "default_popup": "popup.html"
+  },
+  "background": {
+    "service_worker": "background.js"
+  }
+}

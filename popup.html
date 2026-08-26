@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Tabora</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body class="popup-body">
+    <main class="popup-shell">
+      <header class="popup-header">
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true"></div>
+          <span>Tabora</span>
+        </div>
+        <button class="icon-button" id="openDashboard" title="Open dashboard" aria-label="Open dashboard">
+          <span class="icon-grid"></span>
+        </button>
+      </header>
+
+      <section class="quick-panel">
+        <label class="field-label" for="sessionName">Session name</label>
+        <input id="sessionName" class="text-input" type="text" placeholder="Design Research">
+        <div class="quick-row">
+          <select id="workspaceSelect" class="select-input" aria-label="Workspace"></select>
+          <button id="saveCurrent" class="primary-button">Save Current Window</button>
+        </div>
+      </section>
+
+      <div class="search-wrap">
+        <span class="icon-search" aria-hidden="true"></span>
+        <input id="searchInput" type="search" placeholder="Search tabs">
+      </div>
+
+      <section class="section-block">
+        <div class="section-title">Recent Sessions</div>
+        <div id="recentSessions" class="session-list"></div>
+      </section>
+
+      <section class="section-block">
+        <div class="section-title">Workspaces</div>
+        <div id="workspaceList" class="workspace-list"></div>
+      </section>
+    </main>
+
+    <script src="shared.js"></script>
+    <script src="popup.js"></script>
+  </body>
+</html>

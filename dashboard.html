@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Tabora Dashboard</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <aside class="sidebar">
+      <div class="brand large">
+        <div class="brand-mark" aria-hidden="true"></div>
+        <span>Tabora</span>
+      </div>
+      <button id="saveFromDashboard" class="primary-button wide">Save Current Window</button>
+      <nav class="nav-list">
+        <button class="nav-item active" data-filter="all"><span class="icon-box"></span>All Sessions</button>
+        <button class="nav-item" data-filter="starred"><span class="icon-star"></span>Starred</button>
+      </nav>
+      <div class="sidebar-heading">Workspaces</div>
+      <div id="dashboardWorkspaceList" class="workspace-list"></div>
+    </aside>
+
+    <main class="dashboard-main">
+      <header class="dashboard-header">
+        <div>
+          <h1>All Sessions</h1>
+          <p>Save tabs, close the clutter, and come back exactly where you left off.</p>
+        </div>
+        <div class="dashboard-actions">
+          <div class="search-wrap dashboard-search">
+            <span class="icon-search" aria-hidden="true"></span>
+            <input id="dashboardSearch" type="search" placeholder="Search tabs">
+          </div>
+          <select id="dashboardWorkspaceSelect" class="select-input" aria-label="Workspace filter"></select>
+        </div>
+      </header>
+
+      <section id="sessionGrid" class="session-grid"></section>
+    </main>
+
+    <script src="shared.js"></script>
+    <script src="dashboard.js"></script>
+  </body>
+</html>
