@@ -9,37 +9,32 @@
   <body class="popup-body">
     <main class="popup-shell">
       <header class="popup-header">
-        <div class="brand">
-          <div class="brand-mark" aria-hidden="true"></div>
-          <span>Tabora</span>
-        </div>
-        <button class="icon-button" id="openDashboard" title="Open dashboard" aria-label="Open dashboard">
-          <span class="icon-grid"></span>
-        </button>
+        <div class="brand"><span class="brand-mark" aria-hidden="true"></span><span>Tabora</span></div>
+        <button id="openDashboard" class="square-button" title="Open Tabora" aria-label="Open Tabora"><span class="icon-organize"></span></button>
       </header>
 
       <section class="quick-panel">
-        <label class="field-label" for="sessionName">Session name</label>
-        <input id="sessionName" class="text-input" type="text" placeholder="Design Research">
+        <label class="field-label" for="captureName">Save current window as a board</label>
+        <input id="captureName" class="text-input" placeholder="Research session" maxlength="60">
         <div class="quick-row">
-          <select id="workspaceSelect" class="select-input" aria-label="Workspace"></select>
-          <button id="saveCurrent" class="primary-button">Save Current Window</button>
+          <select id="capturePage" class="select-input" aria-label="Destination page"></select>
+          <button id="saveWindow" class="accent-button">Save window</button>
+        </div>
+        <label class="field-label" for="targetBoard">Or add this tab to a board</label>
+        <div class="quick-row">
+          <select id="targetBoard" class="select-input" aria-label="Destination board"></select>
+          <button id="addCurrentTab" class="secondary-button">Add tab</button>
         </div>
       </section>
 
-      <div class="search-wrap">
-        <span class="icon-search" aria-hidden="true"></span>
-        <input id="searchInput" type="search" placeholder="Search tabs">
-      </div>
+      <label class="popup-search">
+        <span class="icon-search"></span>
+        <input id="popupSearch" type="search" placeholder="Search boards and links" autocomplete="off">
+      </label>
 
       <section class="section-block">
-        <div class="section-title">Recent Sessions</div>
-        <div id="recentSessions" class="session-list"></div>
-      </section>
-
-      <section class="section-block">
-        <div class="section-title">Workspaces</div>
-        <div id="workspaceList" class="workspace-list"></div>
+        <div class="section-title">Recent boards</div>
+        <div id="recentBoards" class="popup-board-list"></div>
       </section>
     </main>
 

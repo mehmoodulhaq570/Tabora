@@ -1,9 +1,13 @@
 {
   "manifest_version": 3,
   "name": "Tabora",
-  "description": "Save, search, organize, and restore beautiful tab sessions.",
-  "version": "0.1.0",
+  "description": "Organize bookmarks into beautiful pages and boards on every new tab.",
+  "version": "2.0.0",
   "permissions": ["tabs", "storage"],
+  "optional_permissions": ["bookmarks"],
+  "chrome_url_overrides": {
+    "newtab": "dashboard.html"
+  },
   "action": {
     "default_title": "Tabora",
     "default_popup": "popup.html"

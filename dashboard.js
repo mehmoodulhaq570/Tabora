@@ -1,156 +1,671 @@
-const dashboardSearch = document.querySelector("#dashboardSearch");
-const dashboardWorkspaceSelect = document.querySelector("#dashboardWorkspaceSelect");
-const dashboardWorkspaceList = document.querySelector("#dashboardWorkspaceList");
-const sessionGrid = document.querySelector("#sessionGrid");
+const nodes = {
+  pageTabs: document.querySelector("#pageTabs"),
+  pageFormPanel: document.querySelector("#pageFormPanel"),
+  pageForm: document.querySelector("#pageForm"),
+  pageName: document.querySelector("#pageName"),
+  searchPanel: document.querySelector("#searchPanel"),
+  globalSearch: document.querySelector("#globalSearch"),
+  boardGrid: document.querySelector("#boardGrid"),
+  activePageTitle: document.querySelector("#activePageTitle"),
+  boardCount: document.querySelector("#boardCount"),
+  contextMenu: document.querySelector("#contextMenu"),
+  boardDialog: document.querySelector("#boardDialog"),
+  boardForm: document.querySelector("#boardForm"),
+  boardName: document.querySelector("#boardName"),
+  editingBoardId: document.querySelector("#editingBoardId"),
+  linkDialog: document.querySelector("#linkDialog"),
+  linkForm: document.querySelector("#linkForm"),
+  linkTitle: document.querySelector("#linkTitle"),
+  linkUrl: document.querySelector("#linkUrl"),
+  linkNote: document.querySelector("#linkNote"),
+  linkBoardId: document.querySelector("#linkBoardId"),
+  editingLinkId: document.querySelector("#editingLinkId"),
+  importDialog: document.querySelector("#importDialog"),
+  textImportPanel: document.querySelector("#textImportPanel"),
+  importText: document.querySelector("#importText"),
+  importPreview: document.querySelector("#importPreview"),
+  trashDialog: document.querySelector("#trashDialog"),
+  trashList: document.querySelector("#trashList"),
+  settingsDialog: document.querySelector("#settingsDialog"),
+  onboardingCard: document.querySelector("#onboardingCard"),
+  toast: document.querySelector("#toast")
+};
 
-let state = { sessions: [], workspaces: [] };
-let activeWorkspace = "all";
-let starredOnly = false;
+let appState = createDefaultState();
+let draggedItem = null;
+let customWallpaperUrl = "";
+let toastTimer = null;
+let pendingImportGroups = [];
 
-async function initDashboard() {
-  state = await getState();
-  renderDashboardWorkspaceControls();
-  renderDashboard();
+async function init() {
+  appState = await getTaboraState();
+  await applyAppearance();
+  render();
 }
 
-function renderDashboardWorkspaceControls() {
-  dashboardWorkspaceSelect.innerHTML = '<option value="all">All Workspaces</option>';
-  for (const workspace of state.workspaces) {
-    const option = document.createElement("option");
-    option.value = workspace.id;
-    option.textContent = workspace.name;
-    dashboardWorkspaceSelect.append(option);
-  }
+function activePage() {
+  return appState.pages.find((page) => page.id === appState.settings.activePageId) || appState.pages[0];
+}
 
-  dashboardWorkspaceList.innerHTML = "";
-  for (const workspace of state.workspaces) {
+function activeBoards() {
+  return ordered(appState.boards.filter((board) => board.pageId === activePage().id));
+}
+
+function render() {
+  renderPages();
+  renderBoards();
+  renderToolState();
+  renderOnboarding();
+}
+
+function renderPages() {
+  nodes.pageTabs.innerHTML = "";
+  for (const page of ordered(appState.pages)) {
     const button = document.createElement("button");
-    button.className = "workspace-row clickable";
-    button.dataset.workspace = workspace.id;
-    button.innerHTML = `
-      <span class="workspace-color" style="background:${workspace.color}"></span>
-      <strong></strong>
-      <span></span>
-    `;
-    setText(button, "strong", workspace.name);
-    setText(button, "span:last-child", String(state.sessions.filter((session) => session.workspaceId === workspace.id).length));
-    dashboardWorkspaceList.append(button);
+    button.className = "page-tab";
+    button.dataset.pageId = page.id;
+    button.textContent = page.name;
+    button.classList.toggle("active", page.id === activePage().id);
+    nodes.pageTabs.append(button);
+  }
+  nodes.activePageTitle.textContent = activePage().name;
+  document.querySelector("#pageMenuButton").hidden = Boolean(activePage().protected);
+}
+
+function renderBoards() {
+  const query = nodes.globalSearch.value.trim();
+  const boards = activeBoards().filter((board) => boardMatches(board, query));
+  nodes.boardGrid.innerHTML = "";
+  nodes.boardCount.textContent = `${boards.length} ${boards.length === 1 ? "board" : "boards"}`;
+
+  for (const board of boards) nodes.boardGrid.append(createBoardCard(board, query));
+
+  if (!query) {
+    const addTile = document.createElement("button");
+    addTile.className = "add-board-tile";
+    addTile.dataset.addBoard = "true";
+    addTile.innerHTML = '<span class="add-circle"><span class="icon-plus"></span></span><strong>Add Board</strong><small>Create a collection for related links</small>';
+    nodes.boardGrid.append(addTile);
+  }
+
+  if (!boards.length && query) {
+    const empty = document.createElement("div");
+    empty.className = "search-empty";
+    empty.innerHTML = "<strong>No matching links</strong><span>Try a different title, domain, or URL.</span>";
+    nodes.boardGrid.append(empty);
   }
 }
 
-function getFilteredSessions() {
-  return state.sessions
-    .filter((session) => sessionMatches(session, dashboardSearch.value))
-    .filter((session) => activeWorkspace === "all" || session.workspaceId === activeWorkspace)
-    .filter((session) => !starredOnly || session.starred);
-}
+function createBoardCard(board, query) {
+  const card = document.createElement("article");
+  card.className = "board-card";
+  card.dataset.boardId = board.id;
+  card.draggable = appState.settings.organizeMode;
 
-function renderDashboard() {
-  const sessions = getFilteredSessions();
-  sessionGrid.innerHTML = "";
+  const header = document.createElement("header");
+  header.className = "board-header";
+  header.innerHTML = `
+    <div class="board-title"><span class="drag-grip" aria-hidden="true">&#8942;&#8942;</span><h2></h2></div>
+    <div class="board-actions">
+      <button class="board-icon-button" data-add-link="${board.id}" title="Add link" aria-label="Add link"><span class="icon-link-plus"></span></button>
+      <button class="board-icon-button" data-board-menu="${board.id}" title="Board options" aria-label="Board options">&vellip;</button>
+    </div>`;
+  setText(header, "h2", board.name);
+  card.append(header);
 
-  if (!sessions.length) {
-    sessionGrid.innerHTML = '<div class="empty-state dashboard-empty">No sessions match your search.</div>';
-    return;
+  const list = document.createElement("div");
+  list.className = "board-links";
+  list.dataset.dropBoard = board.id;
+  const normalizedQuery = query.toLowerCase();
+  const links = ordered(board.links).filter((link) => !normalizedQuery || [link.title, link.url, link.note].some((value) => String(value || "").toLowerCase().includes(normalizedQuery)));
+
+  if (!links.length) {
+    const empty = document.createElement("button");
+    empty.className = "empty-board-link";
+    empty.dataset.addLink = board.id;
+    empty.textContent = query ? "Board title matches" : "Add your first link";
+    list.append(empty);
   }
 
-  for (const session of sessions) {
-    const card = document.createElement("article");
-    card.className = "session-card";
+  for (const link of links) list.append(createLinkRow(board, link));
+  card.append(list);
 
-    const tabList = document.createElement("div");
-    tabList.className = "tab-list";
-    for (const tab of session.tabs.slice(0, 5)) {
-      const row = document.createElement("a");
-      row.className = "tab-row";
-      row.href = tab.url;
-      row.target = "_blank";
-      row.rel = "noreferrer";
-      row.append(faviconNode(tab));
+  const footer = document.createElement("footer");
+  footer.className = "board-footer";
+  footer.innerHTML = `<span>${board.links.length} ${board.links.length === 1 ? "link" : "links"}</span><button data-open-board="${board.id}">Open all</button>`;
+  card.append(footer);
+  return card;
+}
 
-      const title = document.createElement("span");
-      title.textContent = tab.title || tab.url;
-      row.append(title);
-      tabList.append(row);
+function createLinkRow(board, link) {
+  const row = document.createElement("div");
+  row.className = "bookmark-row";
+  row.dataset.linkId = link.id;
+  row.dataset.boardId = board.id;
+  row.draggable = appState.settings.organizeMode;
+
+  const anchor = document.createElement("a");
+  anchor.href = link.url;
+  anchor.dataset.openLink = link.id;
+  anchor.dataset.boardId = board.id;
+  anchor.append(faviconNode(link));
+  const copy = document.createElement("span");
+  copy.className = "bookmark-copy";
+  const title = document.createElement("strong");
+  title.textContent = link.title;
+  const domain = document.createElement("small");
+  domain.className = "private-detail";
+  domain.textContent = getDomain(link.url);
+  copy.append(title, domain);
+  anchor.append(copy);
+
+  const actions = document.createElement("span");
+  actions.className = "link-actions";
+  actions.innerHTML = `<button data-edit-link="${link.id}" data-board-id="${board.id}" title="Edit link" aria-label="Edit link">&#9998;</button><button data-delete-link="${link.id}" data-board-id="${board.id}" title="Delete link" aria-label="Delete link">&times;</button>`;
+  row.append(anchor, actions);
+  return row;
+}
+
+function renderToolState() {
+  document.body.classList.toggle("privacy-mode", appState.settings.privacyMode);
+  document.body.classList.toggle("organize-mode", appState.settings.organizeMode);
+  document.body.classList.toggle("light-theme", appState.settings.theme === "light");
+  document.querySelector("#privacyTool").classList.toggle("active", appState.settings.privacyMode);
+  document.querySelector("#organizeTool").classList.toggle("active", appState.settings.organizeMode);
+  document.querySelector("#incognitoTool").classList.toggle("active", appState.settings.incognitoMode);
+}
+
+function renderOnboarding() {
+  nodes.onboardingCard.hidden = appState.settings.onboardingComplete || appState.boards.length > 0;
+}
+
+function showToast(message) {
+  clearTimeout(toastTimer);
+  nodes.toast.textContent = message;
+  nodes.toast.hidden = false;
+  toastTimer = setTimeout(() => { nodes.toast.hidden = true; }, 2800);
+}
+
+function openBoardDialog(board = null) {
+  nodes.editingBoardId.value = board?.id || "";
+  nodes.boardName.value = board?.name || "";
+  document.querySelector("#boardDialogTitle").textContent = board ? "Rename board" : "Add board";
+  nodes.boardDialog.showModal();
+  nodes.boardName.focus();
+}
+
+function openLinkDialog(boardId, link = null) {
+  nodes.linkBoardId.value = boardId;
+  nodes.editingLinkId.value = link?.id || "";
+  nodes.linkTitle.value = link?.title || "";
+  nodes.linkUrl.value = link?.url || "";
+  nodes.linkNote.value = link?.note || "";
+  document.querySelector("#linkDialogTitle").textContent = link ? "Edit link" : "Add link";
+  nodes.linkDialog.showModal();
+  (link ? nodes.linkTitle : nodes.linkUrl).focus();
+}
+
+function closeDialog(id) {
+  document.querySelector(`#${id}`)?.close();
+}
+
+function showContextMenu(anchor, items) {
+  nodes.contextMenu.innerHTML = "";
+  for (const item of items) {
+    if (item.separator) {
+      nodes.contextMenu.append(document.createElement("hr"));
+      continue;
     }
+    const button = document.createElement("button");
+    button.className = item.danger ? "danger-menu-item" : "";
+    button.innerHTML = `<span>${item.icon || ""}</span><span></span>`;
+    setText(button, "span:last-child", item.label);
+    button.addEventListener("click", async () => {
+      nodes.contextMenu.hidden = true;
+      await item.action();
+    });
+    nodes.contextMenu.append(button);
+  }
+  nodes.contextMenu.hidden = false;
+  const rect = anchor.getBoundingClientRect();
+  const width = 230;
+  nodes.contextMenu.style.left = `${Math.min(rect.left, window.innerWidth - width - 16)}px`;
+  nodes.contextMenu.style.top = `${Math.min(rect.bottom + 6, window.innerHeight - nodes.contextMenu.offsetHeight - 16)}px`;
+}
 
-    card.innerHTML = `
-      <div class="card-menu">
-        <span class="session-dot" style="background:${session.workspaceColor}"></span>
-        <button class="icon-button star-button ${session.starred ? "selected" : ""}" data-star="${session.id}" title="Star session" aria-label="Star session">
-          <span class="icon-star"></span>
-        </button>
-      </div>
-      <div class="card-meta">${formatRelativeTime(session.createdAt)}</div>
-      <h2></h2>
-      <div class="workspace-pill" style="--pill-color:${session.workspaceColor}"></div>
-      <div class="tab-count"></div>
-    `;
-    setText(card, "h2", session.name);
-    setText(card, ".workspace-pill", session.workspaceName);
-    setText(card, ".tab-count", `${session.tabs.length} tabs`);
-    card.append(tabList);
+function boardMenuItems(board) {
+  const items = [
+    { icon: "&#8599;", label: "Open all links", action: () => openBoard(board) },
+    { icon: "+", label: "Add link", action: () => openLinkDialog(board.id) },
+    { icon: "&#9998;", label: "Rename board", action: () => openBoardDialog(board) },
+    { icon: "&#128203;", label: "Share / copy links", action: () => copyBoardLinks(board) }
+  ];
+  const otherPages = ordered(appState.pages).filter((page) => page.id !== board.pageId);
+  for (const page of otherPages) {
+    items.push({ icon: "&#8594;", label: `Move to ${page.name}`, action: async () => { await moveBoard(board.id, page.id); await refresh("Board moved"); } });
+  }
+  items.push({ separator: true }, { icon: "&#128465;", label: "Delete board", danger: true, action: async () => { await deleteBoard(board.id); await refresh("Board moved to Trash"); } });
+  return items;
+}
 
-    const actions = document.createElement("div");
-    actions.className = "card-actions";
-    actions.innerHTML = `
-      <button class="primary-button restore-button" data-restore="${session.id}">Restore</button>
-      <button class="ghost-button" data-delete="${session.id}">Delete</button>
-    `;
-    card.append(actions);
-    sessionGrid.append(card);
+async function openBoard(board) {
+  try {
+    await openLinks(ordered(board.links), appState.settings.incognitoMode);
+  } catch {
+    showToast("Private opening is unavailable. Enable Tabora in Brave private windows.");
   }
 }
 
-document.querySelector("#saveFromDashboard").addEventListener("click", async () => {
-  await saveCurrentWindow("Saved Session", activeWorkspace === "all" ? state.workspaces[0].id : activeWorkspace);
-  state = await getState();
-  renderDashboardWorkspaceControls();
-  renderDashboard();
-});
+async function openSingleLink(link) {
+  try {
+    if (appState.settings.incognitoMode) {
+      await chrome.windows.create({ url: link.url, incognito: true, focused: true });
+    } else {
+      await chrome.tabs.create({ url: link.url, active: true });
+    }
+  } catch {
+    showToast("Could not open a private window. Check Brave extension settings.");
+  }
+}
 
-dashboardSearch.addEventListener("input", renderDashboard);
-dashboardWorkspaceSelect.addEventListener("change", (event) => {
-  activeWorkspace = event.target.value;
-  starredOnly = false;
-  renderDashboard();
-});
+async function copyBoardLinks(board) {
+  const text = ordered(board.links).map((link) => `${link.title} | ${link.url}`).join("\n");
+  await navigator.clipboard.writeText(text);
+  showToast("Board links copied");
+}
 
-dashboardWorkspaceList.addEventListener("click", (event) => {
-  const button = event.target.closest("[data-workspace]");
+async function refresh(message = "") {
+  appState = await getTaboraState();
+  render();
+  if (message) showToast(message);
+}
+
+nodes.pageTabs.addEventListener("click", async (event) => {
+  const button = event.target.closest("[data-page-id]");
   if (!button) return;
-  activeWorkspace = button.dataset.workspace;
-  dashboardWorkspaceSelect.value = activeWorkspace;
-  starredOnly = false;
-  renderDashboard();
+  await setSetting("activePageId", button.dataset.pageId);
+  await refresh();
 });
 
-document.querySelector(".nav-list").addEventListener("click", (event) => {
-  const item = event.target.closest("[data-filter]");
-  if (!item) return;
-  document.querySelectorAll(".nav-item").forEach((button) => button.classList.remove("active"));
-  item.classList.add("active");
-  starredOnly = item.dataset.filter === "starred";
-  if (!starredOnly) activeWorkspace = "all";
-  dashboardWorkspaceSelect.value = activeWorkspace;
-  renderDashboard();
+document.querySelector("#goHome").addEventListener("click", async () => {
+  await setSetting("activePageId", "home");
+  await refresh();
 });
 
-sessionGrid.addEventListener("click", async (event) => {
-  const restoreId = event.target.dataset.restore;
-  const deleteId = event.target.dataset.delete;
-  const starId = event.target.closest("[data-star]")?.dataset.star;
+document.querySelector("#addPageButton").addEventListener("click", () => {
+  nodes.pageFormPanel.hidden = !nodes.pageFormPanel.hidden;
+  if (!nodes.pageFormPanel.hidden) nodes.pageName.focus();
+});
 
-  if (restoreId) await restoreSession(restoreId);
-  if (deleteId) await deleteSession(deleteId);
-  if (starId) await toggleStar(starId);
+document.querySelector("#cancelPage").addEventListener("click", () => { nodes.pageFormPanel.hidden = true; });
 
-  if (deleteId || starId) {
-    state = await getState();
-    renderDashboardWorkspaceControls();
-    renderDashboard();
+nodes.pageForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (!nodes.pageName.value.trim()) return;
+  await addPage(nodes.pageName.value);
+  nodes.pageName.value = "";
+  nodes.pageFormPanel.hidden = true;
+  await refresh("Page created");
+});
+
+document.querySelector("#pageMenuButton").addEventListener("click", (event) => {
+  const page = activePage();
+  showContextMenu(event.currentTarget, [
+    { icon: "&#9998;", label: "Rename page", action: async () => { const name = window.prompt("Page name", page.name); if (name) { await renamePage(page.id, name); await refresh("Page renamed"); } } },
+    { separator: true },
+    { icon: "&#128465;", label: "Delete page", danger: true, action: async () => { if (window.confirm(`Delete ${page.name} and move its boards to Trash?`)) { await deletePage(page.id); await refresh("Page deleted"); } } }
+  ]);
+});
+
+nodes.boardGrid.addEventListener("click", async (event) => {
+  const addBoardButton = event.target.closest("[data-add-board]");
+  const addLinkButton = event.target.closest("[data-add-link]");
+  const menuButton = event.target.closest("[data-board-menu]");
+  const openButton = event.target.closest("[data-open-board]");
+  const linkAnchor = event.target.closest("[data-open-link]");
+  const editLinkButton = event.target.closest("[data-edit-link]");
+  const deleteLinkButton = event.target.closest("[data-delete-link]");
+
+  if (addBoardButton) openBoardDialog();
+  if (addLinkButton) openLinkDialog(addLinkButton.dataset.addLink);
+  if (menuButton) {
+    const board = appState.boards.find((item) => item.id === menuButton.dataset.boardMenu);
+    if (board) showContextMenu(menuButton, boardMenuItems(board));
+  }
+  if (openButton) {
+    const board = appState.boards.find((item) => item.id === openButton.dataset.openBoard);
+    if (board) await openBoard(board);
+  }
+  if (linkAnchor) {
+    event.preventDefault();
+    const board = appState.boards.find((item) => item.id === linkAnchor.dataset.boardId);
+    const link = board?.links.find((item) => item.id === linkAnchor.dataset.openLink);
+    if (link) await openSingleLink(link);
+  }
+  if (editLinkButton) {
+    const board = appState.boards.find((item) => item.id === editLinkButton.dataset.boardId);
+    const link = board?.links.find((item) => item.id === editLinkButton.dataset.editLink);
+    if (link) openLinkDialog(board.id, link);
+  }
+  if (deleteLinkButton && window.confirm("Delete this link?")) {
+    await deleteLink(deleteLinkButton.dataset.boardId, deleteLinkButton.dataset.deleteLink);
+    await refresh("Link deleted");
   }
 });
 
-chrome.storage.onChanged.addListener(initDashboard);
-initDashboard();
+nodes.boardForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (!nodes.boardName.value.trim()) return;
+  if (nodes.editingBoardId.value) await renameBoard(nodes.editingBoardId.value, nodes.boardName.value);
+  else await addBoard(activePage().id, nodes.boardName.value);
+  nodes.boardDialog.close();
+  await refresh(nodes.editingBoardId.value ? "Board renamed" : "Board created");
+});
+
+nodes.linkForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const values = { title: nodes.linkTitle.value, url: nodes.linkUrl.value, note: nodes.linkNote.value };
+  if (!normalizeUrl(values.url)) { showToast("Enter a valid web address"); return; }
+  if (nodes.editingLinkId.value) await updateLink(nodes.linkBoardId.value, nodes.editingLinkId.value, values);
+  else await addLink(nodes.linkBoardId.value, values);
+  nodes.linkDialog.close();
+  await refresh(nodes.editingLinkId.value ? "Link updated" : "Link added");
+});
+
+document.querySelectorAll("[data-close-dialog]").forEach((button) => {
+  button.addEventListener("click", () => closeDialog(button.dataset.closeDialog));
+});
+
+document.querySelectorAll("dialog").forEach((dialog) => {
+  dialog.addEventListener("click", (event) => { if (event.target === dialog) dialog.close(); });
+});
+
+document.querySelector("#searchTool").addEventListener("click", () => {
+  nodes.searchPanel.hidden = !nodes.searchPanel.hidden;
+  if (!nodes.searchPanel.hidden) nodes.globalSearch.focus();
+});
+nodes.globalSearch.addEventListener("input", renderBoards);
+document.querySelector("#clearSearch").addEventListener("click", () => { nodes.globalSearch.value = ""; renderBoards(); nodes.globalSearch.focus(); });
+
+document.querySelector("#incognitoTool").addEventListener("click", async () => {
+  await setSetting("incognitoMode", !appState.settings.incognitoMode);
+  await refresh(appState.settings.incognitoMode ? "Private opening disabled" : "Private opening enabled");
+});
+
+document.querySelector("#organizeTool").addEventListener("click", async () => {
+  await setSetting("organizeMode", !appState.settings.organizeMode);
+  await refresh(appState.settings.organizeMode ? "Organize mode closed" : "Drag boards and links to rearrange them");
+});
+
+document.querySelector("#privacyTool").addEventListener("click", async () => {
+  await setSetting("privacyMode", !appState.settings.privacyMode);
+  await refresh(appState.settings.privacyMode ? "Privacy mode disabled" : "URLs are now blurred");
+});
+
+document.querySelector("#settingsTool").addEventListener("click", () => { renderSettings(); nodes.settingsDialog.showModal(); });
+document.querySelector("#wallpaperTool").addEventListener("click", () => { renderSettings(); nodes.settingsDialog.showModal(); });
+document.querySelector("#importTool").addEventListener("click", () => {
+  nodes.textImportPanel.hidden = true;
+  nodes.importPreview.hidden = true;
+  document.querySelector(".import-options").hidden = false;
+  pendingImportGroups = [];
+  nodes.importDialog.showModal();
+});
+document.querySelector("#trashTool").addEventListener("click", () => { renderTrash(); nodes.trashDialog.showModal(); });
+
+nodes.boardGrid.addEventListener("dragstart", (event) => {
+  if (!appState.settings.organizeMode) return;
+  const link = event.target.closest(".bookmark-row");
+  const board = event.target.closest(".board-card");
+  if (link) draggedItem = { type: "link", id: link.dataset.linkId, boardId: link.dataset.boardId };
+  else if (board) draggedItem = { type: "board", id: board.dataset.boardId };
+  event.dataTransfer.effectAllowed = "move";
+  event.target.classList.add("dragging");
+});
+
+nodes.boardGrid.addEventListener("dragend", (event) => { event.target.classList.remove("dragging"); draggedItem = null; });
+nodes.boardGrid.addEventListener("dragover", (event) => { if (draggedItem) event.preventDefault(); });
+nodes.boardGrid.addEventListener("drop", async (event) => {
+  event.preventDefault();
+  const targetBoard = event.target.closest(".board-card");
+  if (!draggedItem || !targetBoard) return;
+  if (draggedItem.type === "board") await reorderBoard(draggedItem.id, targetBoard.dataset.boardId);
+  if (draggedItem.type === "link") {
+    const targetLink = event.target.closest(".bookmark-row");
+    await moveLink(draggedItem.id, draggedItem.boardId, targetBoard.dataset.boardId, targetLink?.dataset.linkId || null);
+  }
+  await refresh("Order updated");
+});
+
+function parseTextLinks(text) {
+  return String(text || "").split(/\r?\n/).map((line) => line.trim()).filter(Boolean).map((line) => {
+    const separator = line.includes("|") ? "|" : line.includes(",") ? "," : null;
+    if (!separator) return { title: "", url: line };
+    const [title, ...urlParts] = line.split(separator);
+    return { title: title.trim().replace(/^['\"]|['\"]$/g, ""), url: urlParts.join(separator).trim().replace(/^['\"]|['\"]$/g, "") };
+  }).filter((link) => normalizeUrl(link.url));
+}
+
+function prepareImport(groups) {
+  const existingUrls = new Set(appState.boards.filter((board) => board.pageId === activePage().id).flatMap((board) => board.links.map((link) => normalizeUrl(link.url))));
+  const seen = new Set(existingUrls);
+  let duplicates = 0;
+  pendingImportGroups = groups.map((group) => ({
+    name: cleanName(group.name, "Imported Links"),
+    links: group.links.filter((link) => {
+      const url = normalizeUrl(link.url);
+      if (!url || seen.has(url)) { duplicates += 1; return false; }
+      seen.add(url);
+      link.url = url;
+      return true;
+    })
+  })).filter((group) => group.links.length);
+
+  const total = pendingImportGroups.reduce((sum, group) => sum + group.links.length, 0);
+  if (!total) { showToast("No new links were found; duplicates were skipped"); return; }
+  nodes.textImportPanel.hidden = true;
+  document.querySelector(".import-options").hidden = true;
+  nodes.importPreview.hidden = false;
+  document.querySelector("#importPreviewTitle").textContent = `${total} links in ${pendingImportGroups.length} ${pendingImportGroups.length === 1 ? "board" : "boards"}`;
+  document.querySelector("#importPreviewDetails").textContent = duplicates ? `${duplicates} duplicate or invalid links will be skipped.` : "No duplicates found.";
+  const list = document.querySelector("#importPreviewBoards");
+  list.innerHTML = "";
+  for (const group of pendingImportGroups) {
+    const row = document.createElement("div");
+    row.className = "preview-board-row";
+    row.innerHTML = "<strong></strong><span></span>";
+    setText(row, "strong", group.name);
+    setText(row, "span", `${group.links.length} links`);
+    list.append(row);
+  }
+}
+
+async function importBrowserBookmarks() {
+  const granted = await chrome.permissions.request({ permissions: ["bookmarks"] });
+  if (!granted) { showToast("Bookmark access was not granted"); return; }
+  const tree = await chrome.bookmarks.getTree();
+  const groups = [];
+  const loose = [];
+  function walk(node, parentTitle = "") {
+    const links = (node.children || []).filter((child) => child.url).map((child) => ({ title: child.title, url: child.url }));
+    const title = node.title || parentTitle;
+    if (links.length && title) groups.push({ name: title, links });
+    else loose.push(...links);
+    for (const child of node.children || []) if (child.children) walk(child, child.title || title);
+  }
+  walk(tree[0]);
+  if (loose.length) groups.push({ name: "Imported Bookmarks", links: loose });
+  prepareImport(groups);
+}
+
+document.querySelector(".import-options").addEventListener("click", async (event) => {
+  const option = event.target.closest("[data-import]");
+  if (!option) return;
+  if (option.dataset.import === "bookmarks") await importBrowserBookmarks();
+  if (option.dataset.import === "window") {
+    const tabs = await chrome.tabs.query({ currentWindow: true });
+    const links = tabs.filter((tab) => normalizeUrl(tab.url)).map((tab) => ({ title: tab.title, url: tab.url, favIconUrl: tab.favIconUrl || "" }));
+    prepareImport([{ name: "Current Window", links }]);
+  }
+  if (option.dataset.import === "text") { nodes.textImportPanel.hidden = false; nodes.importText.focus(); }
+});
+
+document.querySelector("#confirmTextImport").addEventListener("click", () => prepareImport([{ name: "Imported Links", links: parseTextLinks(nodes.importText.value) }]));
+
+document.querySelector("#importFile").addEventListener("change", async (event) => {
+  const file = event.target.files[0];
+  if (!file) return;
+  const text = await file.text();
+  let links = [];
+  if (/\.html?$/i.test(file.name)) {
+    const doc = new DOMParser().parseFromString(text, "text/html");
+    links = [...doc.querySelectorAll("a[href]")].map((anchor) => ({ title: anchor.textContent.trim(), url: anchor.href }));
+  } else links = parseTextLinks(text);
+  prepareImport([{ name: file.name.replace(/\.[^.]+$/, ""), links }]);
+  event.target.value = "";
+});
+
+document.querySelector("#cancelImportPreview").addEventListener("click", () => {
+  nodes.importPreview.hidden = true;
+  document.querySelector(".import-options").hidden = false;
+});
+
+document.querySelector("#commitImport").addEventListener("click", async () => {
+  if (!pendingImportGroups.length) return;
+  await chrome.storage.local.set({ taboraLastImportBackup: structuredClone(appState) });
+  const total = pendingImportGroups.reduce((sum, group) => sum + group.links.length, 0);
+  for (const group of pendingImportGroups) await addBoard(activePage().id, group.name, group.links);
+  pendingImportGroups = [];
+  nodes.importDialog.close();
+  await refresh(`${total} links imported`);
+});
+
+function renderTrash() {
+  nodes.trashList.innerHTML = "";
+  if (!appState.trash.length) nodes.trashList.innerHTML = '<div class="dialog-empty">Trash is empty.</div>';
+  for (const [index, item] of appState.trash.entries()) {
+    const row = document.createElement("div");
+    row.className = "trash-row";
+    row.innerHTML = `<div><strong></strong><span>${item.value.links?.length || 0} links</span></div><button class="secondary-button" data-restore-index="${index}">Restore</button>`;
+    setText(row, "strong", item.value.name);
+    nodes.trashList.append(row);
+  }
+}
+
+nodes.trashList.addEventListener("click", async (event) => {
+  const button = event.target.closest("[data-restore-index]");
+  if (!button) return;
+  await restoreTrashItem(Number(button.dataset.restoreIndex));
+  await refresh("Board restored");
+  renderTrash();
+});
+
+document.querySelector("#emptyTrash").addEventListener("click", async () => {
+  if (!appState.trash.length || !window.confirm("Permanently delete everything in Trash?")) return;
+  await emptyTrash();
+  await refresh("Trash emptied");
+  renderTrash();
+});
+
+function renderSettings() {
+  document.querySelectorAll("[data-theme]").forEach((button) => button.classList.toggle("active", button.dataset.theme === appState.settings.theme));
+  document.querySelectorAll("[data-wallpaper]").forEach((button) => button.classList.toggle("selected", button.dataset.wallpaper === appState.settings.wallpaper));
+  chrome.storage.local.get("taboraLastImportBackup").then((data) => {
+    document.querySelector("#undoImport").disabled = !data.taboraLastImportBackup;
+  });
+}
+
+document.querySelector(".segmented-control").addEventListener("click", async (event) => {
+  const button = event.target.closest("[data-theme]");
+  if (!button) return;
+  await setSetting("theme", button.dataset.theme);
+  await refresh();
+  renderSettings();
+});
+
+document.querySelector(".wallpaper-grid").addEventListener("click", async (event) => {
+  const button = event.target.closest("[data-wallpaper]");
+  if (!button) return;
+  await setSetting("wallpaper", button.dataset.wallpaper);
+  await refresh();
+  await applyAppearance();
+  renderSettings();
+});
+
+document.querySelector("#wallpaperUpload").addEventListener("change", async (event) => {
+  const file = event.target.files[0];
+  if (!file) return;
+  if (file.size > 12 * 1024 * 1024) { showToast("Choose an image smaller than 12 MB"); return; }
+  await saveWallpaperBlob(file);
+  await setSetting("wallpaper", "custom");
+  await refresh("Custom wallpaper applied");
+  await applyAppearance();
+  event.target.value = "";
+});
+
+document.querySelector("#exportData").addEventListener("click", () => {
+  const blob = new Blob([JSON.stringify(appState, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = `tabora-backup-${new Date().toISOString().slice(0, 10)}.json`;
+  anchor.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+});
+
+document.querySelector("#undoImport").addEventListener("click", async () => {
+  const data = await chrome.storage.local.get("taboraLastImportBackup");
+  if (!data.taboraLastImportBackup || !window.confirm("Undo the most recent import?")) return;
+  await chrome.storage.local.set({ [TABORA_STORAGE_KEY]: data.taboraLastImportBackup });
+  await chrome.storage.local.remove("taboraLastImportBackup");
+  nodes.settingsDialog.close();
+  await refresh("Last import undone");
+});
+
+function openWallpaperDatabase() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open("tabora-assets", 1);
+    request.onupgradeneeded = () => request.result.createObjectStore("wallpapers");
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function saveWallpaperBlob(blob) {
+  const database = await openWallpaperDatabase();
+  await new Promise((resolve, reject) => {
+    const transaction = database.transaction("wallpapers", "readwrite");
+    transaction.objectStore("wallpapers").put(blob, "custom");
+    transaction.oncomplete = resolve;
+    transaction.onerror = () => reject(transaction.error);
+  });
+  database.close();
+}
+
+async function getWallpaperBlob() {
+  const database = await openWallpaperDatabase();
+  const blob = await new Promise((resolve, reject) => {
+    const request = database.transaction("wallpapers").objectStore("wallpapers").get("custom");
+    request.onsuccess = () => resolve(request.result || null);
+    request.onerror = () => reject(request.error);
+  });
+  database.close();
+  return blob;
+}
+
+async function applyAppearance() {
+  const backdrop = document.querySelector("#dashboardBackdrop");
+  if (customWallpaperUrl) { URL.revokeObjectURL(customWallpaperUrl); customWallpaperUrl = ""; }
+  backdrop.className = `dashboard-backdrop wallpaper-${appState.settings.wallpaper}`;
+  backdrop.style.backgroundImage = "";
+  if (appState.settings.wallpaper === "custom") {
+    const blob = await getWallpaperBlob();
+    if (blob) { customWallpaperUrl = URL.createObjectURL(blob); backdrop.style.backgroundImage = `url("${customWallpaperUrl}")`; }
+  }
+}
+
+document.querySelector("#skipOnboarding").addEventListener("click", async () => { await setSetting("onboardingComplete", true); await refresh(); });
+document.addEventListener("click", (event) => { if (!event.target.closest("#contextMenu") && !event.target.closest("[data-board-menu]") && !event.target.closest("#pageMenuButton")) nodes.contextMenu.hidden = true; });
+document.addEventListener("keydown", (event) => { if (event.key === "/" && !event.target.matches("input, textarea")) { event.preventDefault(); nodes.searchPanel.hidden = false; nodes.globalSearch.focus(); } });
+chrome.storage.onChanged.addListener((changes) => { if (changes[TABORA_STORAGE_KEY]) init(); });
+init();

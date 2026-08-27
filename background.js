@@ -1,17 +1,9 @@
+const V2_KEY = "taboraV2";
+
 chrome.runtime.onInstalled.addListener(async () => {
-  const existing = await chrome.storage.local.get(["taboraSessions", "taboraWorkspaces"]);
+  const data = await chrome.storage.local.get(V2_KEY);
+  if (data[V2_KEY]) return;
 
-  if (!existing.taboraWorkspaces) {
-    await chrome.storage.local.set({
-      taboraWorkspaces: [
-        { id: "work", name: "Work", color: "#d68a00" },
-        { id: "study", name: "Study", color: "#2f8bc9" },
-        { id: "reading", name: "Reading", color: "#4c9a61" }
-      ]
-    });
-  }
-
-  if (!existing.taboraSessions) {
-    await chrome.storage.local.set({ taboraSessions: [] });
-  }
+  // The full V1 migration runs in shared.js when the new-tab page first opens.
+  await chrome.storage.local.set({ taboraNeedsMigration: true });
 });
