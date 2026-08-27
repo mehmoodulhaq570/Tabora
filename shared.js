@@ -18,6 +18,15 @@ function createDefaultState() {
       privacyMode: false,
       incognitoMode: false,
       organizeMode: false,
+      compactMode: true,
+      groupRightTools: false,
+      hideExtraBookmarks: false,
+      shortenLongTitles: true,
+      openLinksInNewTab: false,
+      showBookmarkDescriptions: true,
+      closeTabsAfterSaveAll: false,
+      quickSaveDestination: "current-page",
+      language: "en",
       onboardingComplete: false
     }
   };
@@ -321,11 +330,16 @@ async function setSetting(key, value) {
 
 async function saveCurrentWindowAsBoard(pageId, name) {
   const tabs = await chrome.tabs.query({ currentWindow: true });
-  const links = tabs
-    .filter((tab) => normalizeUrl(tab.url))
+  const savableTabs = tabs.filter((tab) => normalizeUrl(tab.url));
+  const links = savableTabs
     .map((tab) => ({ title: tab.title, url: tab.url, favIconUrl: tab.favIconUrl || "" }));
   if (!links.length) return null;
-  return addBoard(pageId, name || "Current Window", links);
+  const board = await addBoard(pageId, name || "Current Window", links);
+  const state = await getTaboraState();
+  if (state.settings.closeTabsAfterSaveAll && savableTabs.length) {
+    await chrome.tabs.remove(savableTabs.map((tab) => tab.id));
+  }
+  return board;
 }
 
 async function openLinks(links, incognito = false) {

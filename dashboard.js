@@ -1,6 +1,6 @@
 const nodes = {
   pageTabs: document.querySelector("#pageTabs"),
-  pageFormPanel: document.querySelector("#pageFormPanel"),
+  pageDialog: document.querySelector("#pageDialog"),
   pageForm: document.querySelector("#pageForm"),
   pageName: document.querySelector("#pageName"),
   searchPanel: document.querySelector("#searchPanel"),
@@ -25,6 +25,7 @@ const nodes = {
   trashDialog: document.querySelector("#trashDialog"),
   trashList: document.querySelector("#trashList"),
   appearancePanel: document.querySelector("#appearancePanel"),
+  settingsDialog: document.querySelector("#settingsDialog"),
   onboardingCard: document.querySelector("#onboardingCard"),
   toast: document.querySelector("#toast")
 };
@@ -167,7 +168,7 @@ function createLinkRow(board, link) {
   title.textContent = link.title;
   const domain = document.createElement("small");
   domain.className = "private-detail";
-  domain.textContent = getDomain(link.url);
+  domain.textContent = link.note || getDomain(link.url);
   copy.append(title, domain);
   anchor.append(copy);
 
@@ -182,6 +183,12 @@ function renderToolState() {
   document.body.classList.toggle("privacy-mode", appState.settings.privacyMode);
   document.body.classList.toggle("organize-mode", appState.settings.organizeMode);
   document.body.classList.toggle("light-theme", appState.settings.theme === "light");
+  document.body.classList.toggle("compact-mode", appState.settings.compactMode);
+  document.body.classList.toggle("hide-extra-bookmarks", appState.settings.hideExtraBookmarks);
+  document.body.classList.toggle("shorten-titles", appState.settings.shortenLongTitles);
+  document.body.classList.toggle("hide-bookmark-descriptions", !appState.settings.showBookmarkDescriptions);
+  document.body.classList.toggle("group-tools", appState.settings.groupRightTools);
+  document.querySelector("#moreToolsTool").hidden = !appState.settings.groupRightTools;
   document.querySelector("#privacyTool").classList.toggle("active", appState.settings.privacyMode);
   document.querySelector("#organizeTool").classList.toggle("active", appState.settings.organizeMode);
   document.querySelector("#incognitoTool").classList.toggle("active", appState.settings.incognitoMode);
@@ -272,8 +279,10 @@ async function openSingleLink(link) {
   try {
     if (appState.settings.incognitoMode) {
       await chrome.windows.create({ url: link.url, incognito: true, focused: true });
-    } else {
+    } else if (appState.settings.openLinksInNewTab) {
       await chrome.tabs.create({ url: link.url, active: true });
+    } else {
+      await chrome.tabs.update({ url: link.url });
     }
   } catch {
     showToast("Could not open a private window. Check Brave extension settings.");
@@ -313,18 +322,17 @@ nodes.pageTabs.addEventListener("contextmenu", (event) => {
 });
 
 document.querySelector("#addPageButton").addEventListener("click", () => {
-  nodes.pageFormPanel.hidden = !nodes.pageFormPanel.hidden;
-  if (!nodes.pageFormPanel.hidden) nodes.pageName.focus();
+  nodes.pageName.value = "";
+  nodes.pageDialog.showModal();
+  nodes.pageName.focus();
 });
-
-document.querySelector("#cancelPage").addEventListener("click", () => { nodes.pageFormPanel.hidden = true; });
 
 nodes.pageForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (!nodes.pageName.value.trim()) return;
   await addPage(nodes.pageName.value);
   nodes.pageName.value = "";
-  nodes.pageFormPanel.hidden = true;
+  nodes.pageDialog.close();
   await refresh("Page created");
 });
 
@@ -423,8 +431,15 @@ function toggleAppearancePanel() {
   if (!nodes.appearancePanel.hidden) renderAppearancePanel();
 }
 
-document.querySelector("#settingsTool").addEventListener("click", toggleAppearancePanel);
 document.querySelector("#wallpaperTool").addEventListener("click", toggleAppearancePanel);
+document.querySelector("#settingsTool").addEventListener("click", () => {
+  nodes.appearancePanel.hidden = true;
+  renderSettings();
+  nodes.settingsDialog.showModal();
+});
+document.querySelector("#moreToolsTool").addEventListener("click", () => {
+  document.querySelector(".tool-rail").classList.toggle("tools-expanded");
+});
 document.querySelector("#importTool").addEventListener("click", () => {
   nodes.textImportPanel.hidden = true;
   nodes.importPreview.hidden = true;
@@ -641,6 +656,71 @@ function renderAppearancePanel() {
     grid.append(button);
   }
 }
+
+function renderSettings() {
+  document.querySelectorAll("[data-setting]").forEach((input) => {
+    input.checked = Boolean(appState.settings[input.dataset.setting]);
+  });
+  document.querySelector("#quickSaveDestination").value = appState.settings.quickSaveDestination;
+  document.querySelector("#languageSelect").value = appState.settings.language;
+}
+
+document.querySelectorAll("[data-settings-view]").forEach((button) => {
+  button.addEventListener("click", () => {
+    document.querySelectorAll("[data-settings-view]").forEach((item) => item.classList.toggle("active", item === button));
+    document.querySelectorAll(".settings-view").forEach((view) => view.classList.toggle("active", view.dataset.view === button.dataset.settingsView));
+  });
+});
+
+document.querySelectorAll("[data-setting]").forEach((input) => {
+  input.addEventListener("change", async () => {
+    await setSetting(input.dataset.setting, input.checked);
+    await refresh();
+    renderSettings();
+  });
+});
+
+document.querySelector("#quickSaveDestination").addEventListener("change", async (event) => {
+  await setSetting("quickSaveDestination", event.target.value);
+  await refresh("Quick Save destination updated");
+});
+
+document.querySelector("#languageSelect").addEventListener("change", async (event) => {
+  await setSetting("language", event.target.value);
+  await refresh("Language preference updated");
+});
+
+document.querySelector("#changeShortcut").addEventListener("click", async () => {
+  try {
+    await chrome.tabs.create({ url: "brave://extensions/shortcuts" });
+  } catch {
+    await chrome.tabs.create({ url: "chrome://extensions/shortcuts" });
+  }
+});
+
+function exportTaboraData() {
+  const blob = new Blob([JSON.stringify(appState, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = `tabora-backup-${new Date().toISOString().slice(0, 10)}.json`;
+  anchor.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  showToast("Tabora backup exported");
+}
+
+document.querySelector("#exportTaboraData").addEventListener("click", exportTaboraData);
+document.querySelector("#supportExport").addEventListener("click", exportTaboraData);
+document.querySelector("#resetPreferences").addEventListener("click", async () => {
+  if (!window.confirm("Reset Tabora preferences? Your pages, boards, and links will stay untouched.")) return;
+  const defaults = createDefaultState().settings;
+  await updateTaboraState((state) => {
+    state.settings = { ...defaults, activePageId: state.settings.activePageId };
+  });
+  nodes.settingsDialog.close();
+  await init();
+  showToast("Preferences reset");
+});
 
 document.querySelector(".segmented-control").addEventListener("click", async (event) => {
   const button = event.target.closest("[data-theme]");

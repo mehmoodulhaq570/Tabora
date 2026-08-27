@@ -12,17 +12,8 @@
     <div class="dashboard-shell">
       <header class="page-header">
         <nav id="pageTabs" class="page-tabs" aria-label="Pages"></nav>
-        <button id="addPageButton" class="square-button" title="Add page" aria-label="Add page"><span class="icon-plus"></span></button>
+        <button id="addPageButton" class="square-button" title="Add New Page" aria-label="Add New Page"><span class="icon-plus"></span></button>
       </header>
-
-      <div id="pageFormPanel" class="inline-panel page-form-panel" hidden>
-        <form id="pageForm">
-          <label class="sr-only" for="pageName">Page name</label>
-          <input id="pageName" class="dark-input" placeholder="Page name" maxlength="40" autocomplete="off">
-          <button class="accent-button" type="submit">Add</button>
-          <button id="cancelPage" class="danger-icon-button" type="button" aria-label="Cancel">&times;</button>
-        </form>
-      </div>
 
       <div id="searchPanel" class="floating-search" hidden>
         <span class="icon-search"></span>
@@ -36,18 +27,28 @@
     </div>
 
     <aside class="tool-rail" aria-label="Tabora tools">
-      <button id="searchTool" class="rail-button" title="Search" aria-label="Search"><span class="icon-search"></span></button>
-      <button id="importTool" class="rail-button" title="Import" aria-label="Import"><span class="icon-import"></span></button>
-      <button id="incognitoTool" class="rail-button" title="Open links privately" aria-label="Open links privately"><span class="icon-incognito"></span></button>
-      <button id="organizeTool" class="rail-button" title="Organize" aria-label="Organize"><span class="icon-organize"></span></button>
-      <button id="trashTool" class="rail-button" title="Trash" aria-label="Trash"><span class="icon-trash"></span></button>
-      <button id="privacyTool" class="rail-button" title="Privacy mode" aria-label="Privacy mode"><span class="icon-eye"></span></button>
-      <button id="settingsTool" class="rail-button accent-rail" title="Settings" aria-label="Settings"><span class="icon-settings"></span></button>
+      <button id="searchTool" class="rail-button" title="Search" aria-label="Search"><svg class="rail-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7.5"></circle><path d="m16.5 16.5 4 4"></path></svg></button>
+      <button id="importTool" class="rail-button" title="Import" aria-label="Import"><svg class="rail-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12"></path><path d="m7.5 10.5 4.5 4.5 4.5-4.5"></path><path d="M4 16.5V20h16v-3.5"></path></svg></button>
+      <button id="incognitoTool" class="rail-button" title="Open links privately" aria-label="Open links privately"><svg class="rail-icon rail-icon-incognito" viewBox="0 0 24 24" aria-hidden="true"><path d="M6.2 10 8 4.5h8l1.8 5.5"></path><path d="M4 10h16"></path><circle cx="7.5" cy="16" r="3.2"></circle><circle cx="16.5" cy="16" r="3.2"></circle><path d="M10.7 15.3c.8-.7 1.8-.7 2.6 0"></path></svg></button>
+      <button id="organizeTool" class="rail-button" title="Organize" aria-label="Organize"><svg class="rail-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="6" height="6" rx="1"></rect><rect x="14" y="3" width="6" height="6" rx="1"></rect><rect x="3" y="14" width="6" height="6" rx="1"></rect><path d="m13.5 17 2.2 2.2 4.8-5"></path></svg></button>
+      <button id="trashTool" class="rail-button" title="Trash" aria-label="Trash"><svg class="rail-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16"></path><path d="M9 7V4h6v3"></path><path d="m6 7 1 14h10l1-14"></path><path d="M10 11v6M14 11v6"></path></svg></button>
+      <button id="privacyTool" class="rail-button" title="Privacy mode" aria-label="Privacy mode"><svg class="rail-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"></path><circle cx="12" cy="12" r="2.7"></circle></svg></button>
+      <button id="moreToolsTool" class="rail-button more-tools-button" title="More tools" aria-label="More tools" hidden><svg class="rail-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg></button>
+      <button id="settingsTool" class="rail-button accent-rail" title="Settings" aria-label="Settings"><svg class="rail-icon rail-icon-settings" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2"></circle><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M18.7 5.3l-2.1 2.1M7.4 16.6l-2.1 2.1"></path><circle cx="12" cy="12" r="7"></circle></svg></button>
     </aside>
 
     <button id="wallpaperTool" class="wallpaper-button" title="Wallpaper" aria-label="Wallpaper"><span class="icon-image"></span></button>
 
     <div id="contextMenu" class="context-menu" hidden></div>
+
+    <dialog id="pageDialog" class="app-dialog page-dialog">
+      <form id="pageForm">
+        <header class="dialog-header"><h2>Add New Page</h2><button class="dialog-close" type="button" data-close-dialog="pageDialog" aria-label="Close">&times;</button></header>
+        <label for="pageName">Page Name <span aria-hidden="true">*</span></label>
+        <input id="pageName" class="dark-input" placeholder="Enter page name..." maxlength="40" autocomplete="off" required>
+        <footer class="dialog-footer"><button class="secondary-button" type="button" data-close-dialog="pageDialog">Cancel</button><button class="accent-button" type="submit">Create Page</button></footer>
+      </form>
+    </dialog>
 
     <dialog id="boardDialog" class="app-dialog small-dialog">
       <form id="boardForm">
@@ -112,6 +113,50 @@
         <button id="moreWallpapers" class="secondary-button" type="button">More Wallpapers</button>
       </footer>
     </section>
+
+    <dialog id="settingsDialog" class="settings-dialog">
+      <div class="settings-layout">
+        <aside class="settings-sidebar">
+          <h2>Settings</h2>
+          <nav aria-label="Settings sections">
+            <button class="settings-nav-button active" type="button" data-settings-view="general"><span class="icon-settings"></span>General</button>
+            <button class="settings-nav-button" type="button" data-settings-view="account"><span class="settings-nav-icon">&#9675;</span>Account</button>
+            <button class="settings-nav-button" type="button" data-settings-view="language"><span class="settings-nav-icon">&#9678;</span>Language</button>
+            <button class="settings-nav-button" type="button" data-settings-view="support"><span class="settings-nav-icon">?</span>Support</button>
+          </nav>
+        </aside>
+        <div class="settings-content">
+          <button class="dialog-close settings-close" type="button" data-close-dialog="settingsDialog" aria-label="Close">&times;</button>
+          <section class="settings-view active" data-view="general">
+            <h2>General Settings</h2>
+            <fieldset class="settings-group">
+              <legend>Appearance</legend>
+              <label class="setting-row"><span><strong>Compact mode</strong><small>Reduce spacing to show more bookmarks.</small></span><input type="checkbox" data-setting="compactMode"><i></i></label>
+              <label class="setting-row"><span><strong>Group right-side tools</strong><small>Keep Search and Settings visible and place other tools in one menu.</small></span><input type="checkbox" data-setting="groupRightTools"><i></i></label>
+              <label class="setting-row"><span><strong>Hide extra bookmarks in long boards</strong><small>Show the first six bookmarks until the board is opened.</small></span><input type="checkbox" data-setting="hideExtraBookmarks"><i></i></label>
+              <label class="setting-row"><span><strong>Shorten long titles</strong><small>Keep long bookmark titles on one line.</small></span><input type="checkbox" data-setting="shortenLongTitles"><i></i></label>
+            </fieldset>
+            <fieldset class="settings-group">
+              <legend>Behavior</legend>
+              <label class="setting-row"><span><strong>Open links in new tab</strong><small>Open bookmarks in a new browser tab.</small></span><input type="checkbox" data-setting="openLinksInNewTab"><i></i></label>
+              <label class="setting-row"><span><strong>Show bookmark descriptions</strong><small>Display saved notes or website domains below titles.</small></span><input type="checkbox" data-setting="showBookmarkDescriptions"><i></i></label>
+              <label class="setting-row"><span><strong>Close tabs after Save All Tabs</strong><small>Close saved web tabs in the current window.</small></span><input type="checkbox" data-setting="closeTabsAfterSaveAll"><i></i></label>
+              <label class="setting-select-row"><span><strong>Quick Save destination</strong><small>Where Tabora saves new links.</small></span><select id="quickSaveDestination"><option value="current-page">Current Page</option><option value="home">Home</option></select></label>
+              <div class="setting-select-row"><span><strong>Change quick save shortcut</strong><small>Open browser shortcut settings to change this key.</small></span><div class="shortcut-control"><kbd>Ctrl+Shift+Y</kbd><button id="changeShortcut" class="secondary-button" type="button">Change</button></div></div>
+            </fieldset>
+          </section>
+          <section class="settings-view" data-view="account">
+            <h2>Account</h2><div class="settings-info"><strong>Your Tabora is local</strong><p>No account is required. Pages, boards, links, and preferences stay in this browser profile.</p><button id="exportTaboraData" class="secondary-button" type="button">Export Tabora data</button></div>
+          </section>
+          <section class="settings-view" data-view="language">
+            <h2>Language</h2><div class="settings-info"><label for="languageSelect">Interface language</label><select id="languageSelect"><option value="en">English</option></select><p>More interface languages can be added without changing your saved boards.</p></div>
+          </section>
+          <section class="settings-view" data-view="support">
+            <h2>Support</h2><div class="settings-info"><strong>Tabora V2</strong><p>Your data can be exported as JSON for backup or troubleshooting.</p><div class="support-actions"><button id="supportExport" class="secondary-button" type="button">Export backup</button><button id="resetPreferences" class="danger-button" type="button">Reset preferences</button></div></div>
+          </section>
+        </div>
+      </div>
+    </dialog>
 
     <div id="onboardingCard" class="onboarding-card" hidden>
       <strong>Step 1 of 3: Create your first board</strong>

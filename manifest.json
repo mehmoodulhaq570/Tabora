@@ -14,5 +14,13 @@
   },
   "background": {
     "service_worker": "background.js"
+  },
+  "commands": {
+    "quick-save": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+Y"
+      },
+      "description": "Save the current tab to Tabora"
+    }
   }
 }
