@@ -1,5 +1,6 @@
 const TABORA_STORAGE_KEY = "taboraV2";
-const TABORA_SCHEMA_VERSION = 2;
+const TABORA_SCHEMA_VERSION = 3;
+const TABORA_BOARD_COLUMNS = 4;
 
 function makeId(prefix) {
   return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -38,6 +39,24 @@ function normalizeState(value) {
   state.schemaVersion = TABORA_SCHEMA_VERSION;
   state.pages = Array.isArray(state.pages) && state.pages.length ? state.pages : fallback.pages;
   state.boards = Array.isArray(state.boards) ? state.boards : [];
+  for (const page of state.pages) {
+    const pageBoards = [...state.boards]
+      .filter((board) => board.pageId === page.id)
+      .sort((a, b) => (a.order || 0) - (b.order || 0));
+    pageBoards.forEach((board, index) => {
+      if (!Number.isInteger(board.column)) board.column = index % TABORA_BOARD_COLUMNS;
+      board.column = Math.max(0, Math.min(TABORA_BOARD_COLUMNS - 1, board.column));
+      if (!Number.isInteger(board.columnOrder)) {
+        board.columnOrder = pageBoards.slice(0, index).filter((item) => item.column === board.column).length;
+      }
+    });
+    for (let column = 0; column < TABORA_BOARD_COLUMNS; column += 1) {
+      pageBoards
+        .filter((board) => board.column === column)
+        .sort((a, b) => (a.columnOrder || 0) - (b.columnOrder || 0) || (a.order || 0) - (b.order || 0))
+        .forEach((board, index) => { board.columnOrder = index; });
+    }
+  }
   state.trash = Array.isArray(state.trash) ? state.trash : [];
   state.settings = { ...fallback.settings, ...(state.settings || {}) };
   if (!state.pages.some((page) => page.id === state.settings.activePageId)) {
@@ -68,6 +87,8 @@ function migrateV1Data(sessions = [], workspaces = []) {
       pageId,
       name: session.name || "Imported session",
       order: state.boards.filter((board) => board.pageId === pageId).length,
+      column: index % TABORA_BOARD_COLUMNS,
+      columnOrder: Math.floor(index / TABORA_BOARD_COLUMNS),
       starred: Boolean(session.starred),
       createdAt: session.createdAt || Date.now() + index,
       links: (session.tabs || []).map((tab, linkIndex) => ({
@@ -185,19 +206,25 @@ async function deletePage(pageId) {
   });
 }
 
-async function addBoard(pageId, name, links = [], insertAt = null) {
+async function addBoard(pageId, name, links = [], placement = null) {
   return updateTaboraState((state) => {
     const page = state.pages.find((item) => item.id === pageId) || state.pages[0];
     const pageBoards = ordered(state.boards.filter((item) => item.pageId === page.id));
-    const boardOrder = Number.isInteger(insertAt) ? Math.max(0, Math.min(insertAt, pageBoards.length)) : pageBoards.length;
-    for (const item of pageBoards) {
-      if ((item.order || 0) >= boardOrder) item.order += 1;
+    const requestedColumn = typeof placement === "object" && placement !== null ? placement.column : pageBoards.length % TABORA_BOARD_COLUMNS;
+    const column = Math.max(0, Math.min(TABORA_BOARD_COLUMNS - 1, Number(requestedColumn) || 0));
+    const columnBoards = pageBoards.filter((item) => item.column === column).sort((a, b) => (a.columnOrder || 0) - (b.columnOrder || 0));
+    const requestedOrder = typeof placement === "object" && placement !== null ? placement.order : columnBoards.length;
+    const columnOrder = Math.max(0, Math.min(Number(requestedOrder) || 0, columnBoards.length));
+    for (const item of columnBoards) {
+      if ((item.columnOrder || 0) >= columnOrder) item.columnOrder += 1;
     }
     const board = {
       id: makeId("board"),
       pageId: page.id,
       name: cleanName(name, "New Board"),
-      order: boardOrder,
+      order: pageBoards.length,
+      column,
+      columnOrder,
       starred: false,
       createdAt: Date.now(),
       links: links.map((link, index) => ({
@@ -228,6 +255,9 @@ async function moveBoard(boardId, pageId) {
     if (!board || !state.pages.some((page) => page.id === pageId)) return;
     board.pageId = pageId;
     board.order = state.boards.filter((item) => item.pageId === pageId).length;
+    const destinationBoards = state.boards.filter((item) => item.pageId === pageId && item.id !== board.id);
+    board.column = destinationBoards.length % TABORA_BOARD_COLUMNS;
+    board.columnOrder = destinationBoards.filter((item) => item.column === board.column).length;
   });
 }
 
@@ -247,6 +277,9 @@ async function restoreTrashItem(index) {
     const board = item.value;
     if (!state.pages.some((page) => page.id === board.pageId)) board.pageId = "home";
     board.order = state.boards.filter((entry) => entry.pageId === board.pageId).length;
+    const destinationBoards = state.boards.filter((entry) => entry.pageId === board.pageId);
+    board.column = destinationBoards.length % TABORA_BOARD_COLUMNS;
+    board.columnOrder = destinationBoards.filter((entry) => entry.column === board.column).length;
     state.boards.push(board);
   });
 }
@@ -300,10 +333,34 @@ async function reorderBoard(boardId, beforeBoardId) {
     const board = state.boards.find((item) => item.id === boardId);
     const target = state.boards.find((item) => item.id === beforeBoardId);
     if (!board || !target || board.pageId !== target.pageId || board.id === target.id) return;
-    const list = ordered(state.boards.filter((item) => item.pageId === board.pageId && item.id !== board.id));
+    const sourceColumn = board.column;
+    const list = state.boards
+      .filter((item) => item.pageId === board.pageId && item.column === target.column && item.id !== board.id)
+      .sort((a, b) => (a.columnOrder || 0) - (b.columnOrder || 0));
     const targetIndex = list.findIndex((item) => item.id === target.id);
     list.splice(targetIndex, 0, board);
-    list.forEach((item, index) => { item.order = index; });
+    board.column = target.column;
+    list.forEach((item, index) => { item.columnOrder = index; });
+    state.boards
+      .filter((item) => item.pageId === board.pageId && item.column === sourceColumn && item.id !== board.id)
+      .sort((a, b) => (a.columnOrder || 0) - (b.columnOrder || 0))
+      .forEach((item, index) => { item.columnOrder = index; });
+  });
+}
+
+async function moveBoardToColumn(boardId, column) {
+  return updateTaboraState((state) => {
+    const board = state.boards.find((item) => item.id === boardId);
+    if (!board) return;
+    const sourceColumn = board.column;
+    const destinationColumn = Math.max(0, Math.min(TABORA_BOARD_COLUMNS - 1, Number(column) || 0));
+    const destination = state.boards.filter((item) => item.pageId === board.pageId && item.column === destinationColumn && item.id !== board.id);
+    board.column = destinationColumn;
+    board.columnOrder = destination.length;
+    state.boards
+      .filter((item) => item.pageId === board.pageId && item.column === sourceColumn && item.id !== board.id)
+      .sort((a, b) => (a.columnOrder || 0) - (b.columnOrder || 0))
+      .forEach((item, index) => { item.columnOrder = index; });
   });
 }
 

@@ -35,7 +35,7 @@ let draggedItem = null;
 let customWallpaperUrl = "";
 let toastTimer = null;
 let pendingImportGroups = [];
-let boardInsertionIndex = Number.MAX_SAFE_INTEGER;
+let boardInsertionPlacement = { column: 0, order: 0 };
 
 const WALLPAPERS = [
   { id: "none", name: "Default", theme: "dark", palette: "dark-default", image: "" },
@@ -70,12 +70,21 @@ function render() {
 function renderPages() {
   nodes.pageTabs.innerHTML = "";
   for (const page of ordered(appState.pages)) {
+    const item = document.createElement("div");
+    item.className = "page-tab-item";
+    item.classList.toggle("active", page.id === activePage().id);
     const button = document.createElement("button");
     button.className = "page-tab";
     button.dataset.pageId = page.id;
     button.textContent = page.name;
-    button.classList.toggle("active", page.id === activePage().id);
-    nodes.pageTabs.append(button);
+    const options = document.createElement("button");
+    options.className = "page-options-button";
+    options.dataset.pageOptions = page.id;
+    options.title = `${page.name} options`;
+    options.setAttribute("aria-label", `${page.name} options`);
+    options.innerHTML = '<span aria-hidden="true">&#9662;</span>';
+    item.append(button, options);
+    nodes.pageTabs.append(item);
   }
 }
 
@@ -83,10 +92,23 @@ function renderBoards() {
   const query = nodes.globalSearch.value.trim();
   const boards = activeBoards().filter((board) => boardMatches(board, query));
   nodes.boardGrid.innerHTML = "";
-  for (const board of boards) nodes.boardGrid.append(createBoardCard(board, query));
+  const columns = Array.from({ length: TABORA_BOARD_COLUMNS }, (_, columnIndex) => {
+    const column = document.createElement("div");
+    column.className = "board-column";
+    column.dataset.boardColumn = String(columnIndex);
+    nodes.boardGrid.append(column);
+    return column;
+  });
+  for (let columnIndex = 0; columnIndex < columns.length; columnIndex += 1) {
+    boards
+      .filter((board) => board.column === columnIndex)
+      .sort((a, b) => (a.columnOrder || 0) - (b.columnOrder || 0))
+      .forEach((board) => columns[columnIndex].append(createBoardCard(board, query)));
+  }
   if (!query) nodes.boardGrid.append(createAddBoardTile());
 
   if (!boards.length && query) {
+    columns.forEach((column) => column.remove());
     const empty = document.createElement("div");
     empty.className = "search-empty";
     empty.innerHTML = "<strong>No matching links</strong><span>Try a different title, domain, or URL.</span>";
@@ -106,6 +128,8 @@ function createBoardCard(board, query) {
   const card = document.createElement("article");
   card.className = "board-card";
   card.dataset.boardId = board.id;
+  card.dataset.column = String(board.column);
+  card.dataset.columnOrder = String(board.columnOrder);
   card.draggable = appState.settings.organizeMode;
 
   const header = document.createElement("header");
@@ -288,6 +312,34 @@ async function copyBoardLinks(board) {
   showToast("Board links copied");
 }
 
+async function copyPageLinks(page) {
+  const boards = appState.boards
+    .filter((board) => board.pageId === page.id)
+    .sort((a, b) => a.column - b.column || a.columnOrder - b.columnOrder);
+  const text = boards.map((board) => {
+    const links = ordered(board.links).map((link) => `${link.title} | ${link.url}`).join("\n");
+    return `${board.name}\n${links}`.trim();
+  }).join("\n\n");
+  await navigator.clipboard.writeText(text || page.name);
+  showToast("Page links copied");
+}
+
+function pageMenuItems(page) {
+  return [
+    { icon: "&#9998;", label: "Rename", action: async () => { const name = window.prompt("Page name", page.name); if (name) { await renamePage(page.id, name); await refresh("Page renamed"); } } },
+    { icon: "&#128279;", label: "Share Page", action: () => copyPageLinks(page) },
+    { separator: true },
+    { icon: "&#128465;", label: "Delete", danger: true, action: async () => {
+      if (page.protected) { showToast("The Home page cannot be deleted"); return; }
+      if (window.confirm(`Delete ${page.name} and move its boards to Trash?`)) {
+        await deletePage(page.id);
+        boardInsertionPlacement = { column: 0, order: 0 };
+        await refresh("Page deleted");
+      }
+    } }
+  ];
+}
+
 async function refresh(message = "") {
   appState = await getTaboraState();
   render();
@@ -295,9 +347,15 @@ async function refresh(message = "") {
 }
 
 nodes.pageTabs.addEventListener("click", async (event) => {
+  const optionsButton = event.target.closest("[data-page-options]");
+  if (optionsButton) {
+    const page = appState.pages.find((item) => item.id === optionsButton.dataset.pageOptions);
+    if (page) showContextMenu(optionsButton, pageMenuItems(page));
+    return;
+  }
   const button = event.target.closest("[data-page-id]");
   if (!button) return;
-  boardInsertionIndex = Number.MAX_SAFE_INTEGER;
+  boardInsertionPlacement = { column: 0, order: 0 };
   await setSetting("activePageId", button.dataset.pageId);
   await refresh();
 });
@@ -305,13 +363,9 @@ nodes.pageTabs.addEventListener("click", async (event) => {
 nodes.pageTabs.addEventListener("contextmenu", (event) => {
   const button = event.target.closest("[data-page-id]");
   const page = appState.pages.find((item) => item.id === button?.dataset.pageId);
-  if (!button || !page || page.protected) return;
+  if (!button || !page) return;
   event.preventDefault();
-  showContextMenu(button, [
-    { icon: "&#9998;", label: "Rename page", action: async () => { const name = window.prompt("Page name", page.name); if (name) { await renamePage(page.id, name); await refresh("Page renamed"); } } },
-    { separator: true },
-    { icon: "&#128465;", label: "Delete page", danger: true, action: async () => { if (window.confirm(`Delete ${page.name} and move its boards to Trash?`)) { await deletePage(page.id); boardInsertionIndex = Number.MAX_SAFE_INTEGER; await refresh("Page deleted"); } } }
-  ]);
+  showContextMenu(button, pageMenuItems(page));
 });
 
 document.querySelector("#addPageButton").addEventListener("click", () => {
@@ -329,6 +383,31 @@ nodes.pageForm.addEventListener("submit", async (event) => {
   await refresh("Page created");
 });
 
+function openInlineBoardEditor(tile) {
+  document.querySelector(".inline-board-form")?.remove();
+  const form = document.createElement("form");
+  form.className = "inline-board-form";
+  form.style.left = tile.style.left;
+  form.style.top = tile.style.top;
+  form.style.width = tile.style.width;
+  if (!tile.style.left) form.classList.add("is-static");
+  form.innerHTML = '<input class="inline-board-input" name="boardName" placeholder="Enter board name..." maxlength="60" autocomplete="off" required><button class="accent-button" type="submit">Add</button><button class="danger-icon-button" type="button" data-cancel-inline-board aria-label="Cancel">&times;</button>';
+  nodes.boardGrid.append(form);
+  hideBoardInsertionPreview();
+  const input = form.querySelector("input");
+  input.focus();
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (!input.value.trim()) return;
+    await addBoard(activePage().id, input.value, [], boardInsertionPlacement);
+    boardInsertionPlacement = { ...boardInsertionPlacement, order: boardInsertionPlacement.order + 1 };
+    await refresh("Board created");
+  });
+  form.querySelector("[data-cancel-inline-board]").addEventListener("click", () => form.remove());
+  form.addEventListener("keydown", (event) => { if (event.key === "Escape") form.remove(); });
+}
+
 nodes.boardGrid.addEventListener("click", async (event) => {
   const addBoardButton = event.target.closest("[data-add-board]");
   const addLinkButton = event.target.closest("[data-add-link]");
@@ -338,7 +417,7 @@ nodes.boardGrid.addEventListener("click", async (event) => {
   const editLinkButton = event.target.closest("[data-edit-link]");
   const deleteLinkButton = event.target.closest("[data-delete-link]");
 
-  if (addBoardButton) openBoardDialog();
+  if (addBoardButton) openInlineBoardEditor(addBoardButton);
   if (addLinkButton) openLinkDialog(addLinkButton.dataset.addLink);
   if (menuButton) {
     const board = appState.boards.find((item) => item.id === menuButton.dataset.boardMenu);
@@ -371,9 +450,8 @@ nodes.boardForm.addEventListener("submit", async (event) => {
   const editing = Boolean(nodes.editingBoardId.value);
   if (editing) await renameBoard(nodes.editingBoardId.value, nodes.boardName.value);
   else {
-    const insertionIndex = Math.min(boardInsertionIndex, activeBoards().length);
-    await addBoard(activePage().id, nodes.boardName.value, [], insertionIndex);
-    boardInsertionIndex = insertionIndex + 1;
+    await addBoard(activePage().id, nodes.boardName.value, [], boardInsertionPlacement);
+    boardInsertionPlacement = { ...boardInsertionPlacement, order: boardInsertionPlacement.order + 1 };
   }
   nodes.boardDialog.close();
   await refresh(editing ? "Board renamed" : "Board created");
@@ -457,9 +535,12 @@ nodes.boardGrid.addEventListener("dragover", (event) => { if (draggedItem) event
 nodes.boardGrid.addEventListener("drop", async (event) => {
   event.preventDefault();
   const targetBoard = event.target.closest(".board-card");
-  if (!draggedItem || !targetBoard) return;
-  if (draggedItem.type === "board") await reorderBoard(draggedItem.id, targetBoard.dataset.boardId);
+  const targetColumn = event.target.closest("[data-board-column]");
+  if (!draggedItem) return;
+  if (draggedItem.type === "board" && targetBoard) await reorderBoard(draggedItem.id, targetBoard.dataset.boardId);
+  else if (draggedItem.type === "board" && targetColumn) await moveBoardToColumn(draggedItem.id, Number(targetColumn.dataset.boardColumn));
   if (draggedItem.type === "link") {
+    if (!targetBoard) return;
     const targetLink = event.target.closest(".bookmark-row");
     await moveLink(draggedItem.id, draggedItem.boardId, targetBoard.dataset.boardId, targetLink?.dataset.linkId || null);
   }
@@ -478,11 +559,8 @@ function hideBoardInsertionPreview() {
   tile.style.width = "";
 }
 
-function rectanglesOverlap(first, second) {
-  return first.left < second.right && first.right > second.left && first.top < second.bottom && first.bottom > second.top;
-}
-
 insertionSurface.addEventListener("pointermove", (event) => {
+  if (nodes.boardGrid.querySelector(".inline-board-form")) return;
   if (nodes.globalSearch.value || appState.settings.organizeMode || event.pointerType === "touch") {
     hideBoardInsertionPreview();
     return;
@@ -492,36 +570,21 @@ insertionSurface.addEventListener("pointermove", (event) => {
   cancelAnimationFrame(insertionFrame);
   insertionFrame = requestAnimationFrame(() => {
     const tile = nodes.boardGrid.querySelector(".add-board-tile");
-    const cards = [...nodes.boardGrid.querySelectorAll(".board-card")];
     if (!tile) return;
     const gridRect = nodes.boardGrid.getBoundingClientRect();
     const gridStyles = getComputedStyle(nodes.boardGrid);
-    const gap = parseFloat(gridStyles.columnGap) || 14;
-    const columns = gridStyles.gridTemplateColumns.split(" ").filter(Boolean);
-    const columnWidth = parseFloat(columns[0]) || Math.min(360, gridRect.width);
-    const cardRects = cards.map((card) => {
-      const rect = card.getBoundingClientRect();
-      return { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom, width: rect.width };
-    });
-    const candidates = [];
-
-    if (!cards.length) {
-      candidates.push({ left: gridRect.left, top: gridRect.top, width: columnWidth, index: 0 });
-    }
-
-    cardRects.forEach((rect, index) => {
-      const slots = [
-        { left: rect.right + gap, top: rect.top, width: rect.width, index: index + 1 },
-        { left: rect.left, top: rect.bottom + gap, width: rect.width, index: index + columns.length }
-      ];
-      for (const slot of slots) {
-        const area = { left: slot.left, right: slot.left + slot.width, top: slot.top, bottom: slot.top + 72 };
-        const insideGrid = area.left >= gridRect.left - 1 && area.right <= gridRect.right + 1 && area.top >= gridRect.top - 1;
-        const occupied = cardRects.some((cardRect) => rectanglesOverlap(area, cardRect));
-        if (insideGrid && !occupied && !candidates.some((item) => Math.abs(item.left - slot.left) < 2 && Math.abs(item.top - slot.top) < 2)) {
-          candidates.push(slot);
-        }
-      }
+    const gap = parseFloat(gridStyles.rowGap) || 14;
+    const candidates = [...nodes.boardGrid.querySelectorAll("[data-board-column]")].map((column, columnIndex) => {
+      const columnRect = column.getBoundingClientRect();
+      const cards = [...column.querySelectorAll(".board-card")];
+      const lastCardRect = cards.at(-1)?.getBoundingClientRect();
+      return {
+        left: columnRect.left,
+        top: lastCardRect ? lastCardRect.bottom + gap : gridRect.top,
+        width: columnRect.width,
+        column: columnIndex,
+        order: cards.length
+      };
     });
 
     const hoveredSlot = candidates.find((slot) => (
@@ -536,7 +599,7 @@ insertionSurface.addEventListener("pointermove", (event) => {
       return;
     }
 
-    boardInsertionIndex = Math.max(0, Math.min(hoveredSlot.index, cards.length));
+    boardInsertionPlacement = { column: hoveredSlot.column, order: hoveredSlot.order };
     tile.style.left = `${hoveredSlot.left - gridRect.left}px`;
     tile.style.top = `${hoveredSlot.top - gridRect.top}px`;
     tile.style.width = `${hoveredSlot.width}px`;
@@ -847,7 +910,7 @@ async function applyAppearance() {
 }
 
 document.querySelector("#skipOnboarding").addEventListener("click", async () => { await setSetting("onboardingComplete", true); await refresh(); });
-document.addEventListener("click", (event) => { if (!event.target.closest("#contextMenu") && !event.target.closest("[data-board-menu]")) nodes.contextMenu.hidden = true; });
+document.addEventListener("click", (event) => { if (!event.target.closest("#contextMenu") && !event.target.closest("[data-board-menu]") && !event.target.closest("[data-page-options]")) nodes.contextMenu.hidden = true; });
 document.addEventListener("keydown", (event) => { if (event.key === "/" && !event.target.matches("input, textarea")) { event.preventDefault(); nodes.searchPanel.hidden = false; nodes.globalSearch.focus(); } });
 chrome.storage.onChanged.addListener((changes) => { if (changes[TABORA_STORAGE_KEY]) init(); });
 init();
