@@ -176,14 +176,19 @@ async function deletePage(pageId) {
   });
 }
 
-async function addBoard(pageId, name, links = []) {
+async function addBoard(pageId, name, links = [], insertAt = null) {
   return updateTaboraState((state) => {
     const page = state.pages.find((item) => item.id === pageId) || state.pages[0];
+    const pageBoards = ordered(state.boards.filter((item) => item.pageId === page.id));
+    const boardOrder = Number.isInteger(insertAt) ? Math.max(0, Math.min(insertAt, pageBoards.length)) : pageBoards.length;
+    for (const item of pageBoards) {
+      if ((item.order || 0) >= boardOrder) item.order += 1;
+    }
     const board = {
       id: makeId("board"),
       pageId: page.id,
       name: cleanName(name, "New Board"),
-      order: state.boards.filter((item) => item.pageId === page.id).length,
+      order: boardOrder,
       starred: false,
       createdAt: Date.now(),
       links: links.map((link, index) => ({

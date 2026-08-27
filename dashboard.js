@@ -6,8 +6,6 @@ const nodes = {
   searchPanel: document.querySelector("#searchPanel"),
   globalSearch: document.querySelector("#globalSearch"),
   boardGrid: document.querySelector("#boardGrid"),
-  activePageTitle: document.querySelector("#activePageTitle"),
-  boardCount: document.querySelector("#boardCount"),
   contextMenu: document.querySelector("#contextMenu"),
   boardDialog: document.querySelector("#boardDialog"),
   boardForm: document.querySelector("#boardForm"),
@@ -26,7 +24,7 @@ const nodes = {
   importPreview: document.querySelector("#importPreview"),
   trashDialog: document.querySelector("#trashDialog"),
   trashList: document.querySelector("#trashList"),
-  settingsDialog: document.querySelector("#settingsDialog"),
+  appearancePanel: document.querySelector("#appearancePanel"),
   onboardingCard: document.querySelector("#onboardingCard"),
   toast: document.querySelector("#toast")
 };
@@ -36,6 +34,16 @@ let draggedItem = null;
 let customWallpaperUrl = "";
 let toastTimer = null;
 let pendingImportGroups = [];
+let boardInsertionIndex = Number.MAX_SAFE_INTEGER;
+
+const WALLPAPERS = [
+  { id: "none", name: "Default", theme: "dark", palette: "dark-default", image: "" },
+  { id: "digital-ocean", name: "Digital Ocean", theme: "dark", palette: "forest", image: "assets/tabora-background.png" },
+  { id: "crimson-realm", name: "Crimson Realm", theme: "dark", palette: "crimson", image: "assets/crimson-realm.png" },
+  { id: "none", name: "Default", theme: "light", palette: "light-default", image: "" },
+  { id: "mist-valley", name: "Mist Valley", theme: "light", palette: "mist", image: "assets/mist-valley.png" },
+  { id: "amber-voyager", name: "Amber Voyager", theme: "light", palette: "amber", image: "assets/amber-voyager.png" }
+];
 
 async function init() {
   appState = await getTaboraState();
@@ -68,24 +76,20 @@ function renderPages() {
     button.classList.toggle("active", page.id === activePage().id);
     nodes.pageTabs.append(button);
   }
-  nodes.activePageTitle.textContent = activePage().name;
-  document.querySelector("#pageMenuButton").hidden = Boolean(activePage().protected);
 }
 
 function renderBoards() {
   const query = nodes.globalSearch.value.trim();
   const boards = activeBoards().filter((board) => boardMatches(board, query));
   nodes.boardGrid.innerHTML = "";
-  nodes.boardCount.textContent = `${boards.length} ${boards.length === 1 ? "board" : "boards"}`;
+  const insertionIndex = Math.min(boardInsertionIndex, boards.length);
+  for (let index = 0; index <= boards.length; index += 1) {
+    if (!query && index === insertionIndex) nodes.boardGrid.append(createAddBoardTile());
+    if (index < boards.length) nodes.boardGrid.append(createBoardCard(boards[index], query));
+  }
 
-  for (const board of boards) nodes.boardGrid.append(createBoardCard(board, query));
-
-  if (!query) {
-    const addTile = document.createElement("button");
-    addTile.className = "add-board-tile";
-    addTile.dataset.addBoard = "true";
-    addTile.innerHTML = '<span class="add-circle"><span class="icon-plus"></span></span><strong>Add Board</strong><small>Create a collection for related links</small>';
-    nodes.boardGrid.append(addTile);
+  if (!query && !nodes.boardGrid.querySelector(".add-board-tile")) {
+    nodes.boardGrid.append(createAddBoardTile());
   }
 
   if (!boards.length && query) {
@@ -94,6 +98,14 @@ function renderBoards() {
     empty.innerHTML = "<strong>No matching links</strong><span>Try a different title, domain, or URL.</span>";
     nodes.boardGrid.append(empty);
   }
+}
+
+function createAddBoardTile() {
+    const addTile = document.createElement("button");
+    addTile.className = "add-board-tile";
+    addTile.dataset.addBoard = "true";
+    addTile.innerHTML = '<span class="add-circle"><span class="icon-plus"></span></span><strong>Add Board</strong>';
+    return addTile;
 }
 
 function createBoardCard(board, query) {
@@ -283,13 +295,21 @@ async function refresh(message = "") {
 nodes.pageTabs.addEventListener("click", async (event) => {
   const button = event.target.closest("[data-page-id]");
   if (!button) return;
+  boardInsertionIndex = Number.MAX_SAFE_INTEGER;
   await setSetting("activePageId", button.dataset.pageId);
   await refresh();
 });
 
-document.querySelector("#goHome").addEventListener("click", async () => {
-  await setSetting("activePageId", "home");
-  await refresh();
+nodes.pageTabs.addEventListener("contextmenu", (event) => {
+  const button = event.target.closest("[data-page-id]");
+  const page = appState.pages.find((item) => item.id === button?.dataset.pageId);
+  if (!button || !page || page.protected) return;
+  event.preventDefault();
+  showContextMenu(button, [
+    { icon: "&#9998;", label: "Rename page", action: async () => { const name = window.prompt("Page name", page.name); if (name) { await renamePage(page.id, name); await refresh("Page renamed"); } } },
+    { separator: true },
+    { icon: "&#128465;", label: "Delete page", danger: true, action: async () => { if (window.confirm(`Delete ${page.name} and move its boards to Trash?`)) { await deletePage(page.id); boardInsertionIndex = Number.MAX_SAFE_INTEGER; await refresh("Page deleted"); } } }
+  ]);
 });
 
 document.querySelector("#addPageButton").addEventListener("click", () => {
@@ -306,15 +326,6 @@ nodes.pageForm.addEventListener("submit", async (event) => {
   nodes.pageName.value = "";
   nodes.pageFormPanel.hidden = true;
   await refresh("Page created");
-});
-
-document.querySelector("#pageMenuButton").addEventListener("click", (event) => {
-  const page = activePage();
-  showContextMenu(event.currentTarget, [
-    { icon: "&#9998;", label: "Rename page", action: async () => { const name = window.prompt("Page name", page.name); if (name) { await renamePage(page.id, name); await refresh("Page renamed"); } } },
-    { separator: true },
-    { icon: "&#128465;", label: "Delete page", danger: true, action: async () => { if (window.confirm(`Delete ${page.name} and move its boards to Trash?`)) { await deletePage(page.id); await refresh("Page deleted"); } } }
-  ]);
 });
 
 nodes.boardGrid.addEventListener("click", async (event) => {
@@ -356,10 +367,15 @@ nodes.boardGrid.addEventListener("click", async (event) => {
 nodes.boardForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (!nodes.boardName.value.trim()) return;
-  if (nodes.editingBoardId.value) await renameBoard(nodes.editingBoardId.value, nodes.boardName.value);
-  else await addBoard(activePage().id, nodes.boardName.value);
+  const editing = Boolean(nodes.editingBoardId.value);
+  if (editing) await renameBoard(nodes.editingBoardId.value, nodes.boardName.value);
+  else {
+    const insertionIndex = Math.min(boardInsertionIndex, activeBoards().length);
+    await addBoard(activePage().id, nodes.boardName.value, [], insertionIndex);
+    boardInsertionIndex = insertionIndex + 1;
+  }
   nodes.boardDialog.close();
-  await refresh(nodes.editingBoardId.value ? "Board renamed" : "Board created");
+  await refresh(editing ? "Board renamed" : "Board created");
 });
 
 nodes.linkForm.addEventListener("submit", async (event) => {
@@ -402,8 +418,13 @@ document.querySelector("#privacyTool").addEventListener("click", async () => {
   await refresh(appState.settings.privacyMode ? "Privacy mode disabled" : "URLs are now blurred");
 });
 
-document.querySelector("#settingsTool").addEventListener("click", () => { renderSettings(); nodes.settingsDialog.showModal(); });
-document.querySelector("#wallpaperTool").addEventListener("click", () => { renderSettings(); nodes.settingsDialog.showModal(); });
+function toggleAppearancePanel() {
+  nodes.appearancePanel.hidden = !nodes.appearancePanel.hidden;
+  if (!nodes.appearancePanel.hidden) renderAppearancePanel();
+}
+
+document.querySelector("#settingsTool").addEventListener("click", toggleAppearancePanel);
+document.querySelector("#wallpaperTool").addEventListener("click", toggleAppearancePanel);
 document.querySelector("#importTool").addEventListener("click", () => {
   nodes.textImportPanel.hidden = true;
   nodes.importPreview.hidden = true;
@@ -435,6 +456,40 @@ nodes.boardGrid.addEventListener("drop", async (event) => {
     await moveLink(draggedItem.id, draggedItem.boardId, targetBoard.dataset.boardId, targetLink?.dataset.linkId || null);
   }
   await refresh("Order updated");
+});
+
+let insertionFrame = null;
+nodes.boardGrid.addEventListener("pointermove", (event) => {
+  if (nodes.globalSearch.value || appState.settings.organizeMode || event.pointerType === "touch") return;
+  cancelAnimationFrame(insertionFrame);
+  insertionFrame = requestAnimationFrame(() => {
+    const tile = nodes.boardGrid.querySelector(".add-board-tile");
+    const cards = [...nodes.boardGrid.querySelectorAll(".board-card")];
+    if (!tile || !cards.length) return;
+
+    let nearestIndex = 0;
+    let nearestDistance = Number.POSITIVE_INFINITY;
+    cards.forEach((card, index) => {
+      const rect = card.getBoundingClientRect();
+      const dx = event.clientX - (rect.left + rect.width / 2);
+      const dy = event.clientY - (rect.top + rect.height / 2);
+      const distance = dx * dx + dy * dy;
+      if (distance < nearestDistance) {
+        nearestDistance = distance;
+        nearestIndex = index;
+      }
+    });
+
+    const nearestRect = cards[nearestIndex].getBoundingClientRect();
+    const withinRow = event.clientY >= nearestRect.top - 18 && event.clientY <= nearestRect.bottom + 18;
+    const insertAfter = withinRow
+      ? event.clientX >= nearestRect.left + nearestRect.width / 2
+      : event.clientY >= nearestRect.top + nearestRect.height / 2;
+    const nextIndex = Math.max(0, Math.min(nearestIndex + (insertAfter ? 1 : 0), cards.length));
+    if (nextIndex === boardInsertionIndex) return;
+    boardInsertionIndex = nextIndex;
+    nodes.boardGrid.insertBefore(tile, cards[nextIndex] || null);
+  });
 });
 
 function parseTextLinks(text) {
@@ -567,29 +622,45 @@ document.querySelector("#emptyTrash").addEventListener("click", async () => {
   renderTrash();
 });
 
-function renderSettings() {
+function renderAppearancePanel() {
   document.querySelectorAll("[data-theme]").forEach((button) => button.classList.toggle("active", button.dataset.theme === appState.settings.theme));
-  document.querySelectorAll("[data-wallpaper]").forEach((button) => button.classList.toggle("selected", button.dataset.wallpaper === appState.settings.wallpaper));
-  chrome.storage.local.get("taboraLastImportBackup").then((data) => {
-    document.querySelector("#undoImport").disabled = !data.taboraLastImportBackup;
-  });
+  const wallpapers = WALLPAPERS.filter((wallpaper) => wallpaper.theme === appState.settings.theme);
+  document.querySelector("#wallpaperCount").textContent = String(wallpapers.length);
+  const grid = document.querySelector("#wallpaperGrid");
+  grid.innerHTML = "";
+  for (const wallpaper of wallpapers) {
+    const button = document.createElement("button");
+    button.className = "wallpaper-swatch";
+    button.dataset.wallpaper = wallpaper.id;
+    button.classList.toggle("selected", wallpaper.id === appState.settings.wallpaper);
+    if (wallpaper.image) button.style.backgroundImage = `url("${wallpaper.image}")`;
+    else button.classList.add("default-swatch");
+    const label = document.createElement("span");
+    label.textContent = wallpaper.name;
+    button.append(label);
+    grid.append(button);
+  }
 }
 
 document.querySelector(".segmented-control").addEventListener("click", async (event) => {
   const button = event.target.closest("[data-theme]");
   if (!button) return;
+  const nextTheme = button.dataset.theme;
+  const currentIsAvailable = WALLPAPERS.some((wallpaper) => wallpaper.id === appState.settings.wallpaper && wallpaper.theme === nextTheme);
   await setSetting("theme", button.dataset.theme);
+  if (!currentIsAvailable && appState.settings.wallpaper !== "custom") await setSetting("wallpaper", "none");
   await refresh();
-  renderSettings();
+  await applyAppearance();
+  renderAppearancePanel();
 });
 
-document.querySelector(".wallpaper-grid").addEventListener("click", async (event) => {
+document.querySelector("#wallpaperGrid").addEventListener("click", async (event) => {
   const button = event.target.closest("[data-wallpaper]");
   if (!button) return;
   await setSetting("wallpaper", button.dataset.wallpaper);
   await refresh();
   await applyAppearance();
-  renderSettings();
+  renderAppearancePanel();
 });
 
 document.querySelector("#wallpaperUpload").addEventListener("change", async (event) => {
@@ -597,30 +668,14 @@ document.querySelector("#wallpaperUpload").addEventListener("change", async (eve
   if (!file) return;
   if (file.size > 12 * 1024 * 1024) { showToast("Choose an image smaller than 12 MB"); return; }
   await saveWallpaperBlob(file);
+  await setSetting("customWallpaperTheme", appState.settings.theme);
   await setSetting("wallpaper", "custom");
   await refresh("Custom wallpaper applied");
   await applyAppearance();
   event.target.value = "";
 });
 
-document.querySelector("#exportData").addEventListener("click", () => {
-  const blob = new Blob([JSON.stringify(appState, null, 2)], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = `tabora-backup-${new Date().toISOString().slice(0, 10)}.json`;
-  anchor.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-});
-
-document.querySelector("#undoImport").addEventListener("click", async () => {
-  const data = await chrome.storage.local.get("taboraLastImportBackup");
-  if (!data.taboraLastImportBackup || !window.confirm("Undo the most recent import?")) return;
-  await chrome.storage.local.set({ [TABORA_STORAGE_KEY]: data.taboraLastImportBackup });
-  await chrome.storage.local.remove("taboraLastImportBackup");
-  nodes.settingsDialog.close();
-  await refresh("Last import undone");
-});
+document.querySelector("#moreWallpapers").addEventListener("click", () => showToast("More original Tabora wallpapers are coming next"));
 
 function openWallpaperDatabase() {
   return new Promise((resolve, reject) => {
@@ -655,6 +710,11 @@ async function getWallpaperBlob() {
 
 async function applyAppearance() {
   const backdrop = document.querySelector("#dashboardBackdrop");
+  const definition = WALLPAPERS.find((wallpaper) => wallpaper.id === appState.settings.wallpaper && wallpaper.theme === appState.settings.theme)
+    || WALLPAPERS.find((wallpaper) => wallpaper.id === "none" && wallpaper.theme === appState.settings.theme);
+  document.body.dataset.palette = appState.settings.wallpaper === "custom"
+    ? (appState.settings.theme === "light" ? "light-default" : "dark-default")
+    : definition.palette;
   if (customWallpaperUrl) { URL.revokeObjectURL(customWallpaperUrl); customWallpaperUrl = ""; }
   backdrop.className = `dashboard-backdrop wallpaper-${appState.settings.wallpaper}`;
   backdrop.style.backgroundImage = "";
@@ -665,7 +725,7 @@ async function applyAppearance() {
 }
 
 document.querySelector("#skipOnboarding").addEventListener("click", async () => { await setSetting("onboardingComplete", true); await refresh(); });
-document.addEventListener("click", (event) => { if (!event.target.closest("#contextMenu") && !event.target.closest("[data-board-menu]") && !event.target.closest("#pageMenuButton")) nodes.contextMenu.hidden = true; });
+document.addEventListener("click", (event) => { if (!event.target.closest("#contextMenu") && !event.target.closest("[data-board-menu]")) nodes.contextMenu.hidden = true; });
 document.addEventListener("keydown", (event) => { if (event.key === "/" && !event.target.matches("input, textarea")) { event.preventDefault(); nodes.searchPanel.hidden = false; nodes.globalSearch.focus(); } });
 chrome.storage.onChanged.addListener((changes) => { if (changes[TABORA_STORAGE_KEY]) init(); });
 init();

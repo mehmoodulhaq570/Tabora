@@ -11,10 +11,6 @@
 
     <div class="dashboard-shell">
       <header class="page-header">
-        <button id="goHome" class="dashboard-brand" aria-label="Open Home page">
-          <span class="brand-mark" aria-hidden="true"></span>
-          <span>Tabora</span>
-        </button>
         <nav id="pageTabs" class="page-tabs" aria-label="Pages"></nav>
         <button id="addPageButton" class="square-button" title="Add page" aria-label="Add page"><span class="icon-plus"></span></button>
       </header>
@@ -35,16 +31,6 @@
       </div>
 
       <main class="workspace-main">
-        <div class="workspace-summary">
-          <div>
-            <span class="eyebrow">Your workspace</span>
-            <h1 id="activePageTitle">Home</h1>
-          </div>
-          <div class="page-actions">
-            <span id="boardCount" class="board-count"></span>
-            <button id="pageMenuButton" class="plain-icon-button page-menu-button" title="Page options" aria-label="Page options">&vellip;</button>
-          </div>
-        </div>
         <section id="boardGrid" class="board-grid" aria-live="polite"></section>
       </main>
     </div>
@@ -114,14 +100,18 @@
       </div>
     </dialog>
 
-    <dialog id="settingsDialog" class="app-dialog settings-dialog">
-      <div class="dialog-content">
-        <header class="dialog-header"><div><span class="eyebrow">Personalize Tabora</span><h2>Appearance</h2></div><button class="dialog-close" type="button" data-close-dialog="settingsDialog" aria-label="Close">&times;</button></header>
-        <section class="setting-section"><h3>Style</h3><div class="segmented-control"><button type="button" data-theme="dark">Dark</button><button type="button" data-theme="light">Light</button></div></section>
-        <section class="setting-section"><div class="setting-title"><h3>Wallpapers</h3><span>Starter collection</span></div><div class="wallpaper-grid"><button class="wallpaper-swatch default-swatch" type="button" data-wallpaper="none"><span>Default</span></button><button class="wallpaper-swatch ocean-swatch" type="button" data-wallpaper="digital-ocean"><span>Digital Ocean</span></button><label class="wallpaper-swatch upload-swatch"><span class="icon-plus"></span><strong>Upload</strong><input id="wallpaperUpload" type="file" accept="image/png,image/jpeg,image/webp"></label></div></section>
-        <section class="setting-section"><h3>Data</h3><div class="settings-actions"><button id="exportData" class="secondary-button" type="button">Export Tabora backup</button><button id="undoImport" class="secondary-button" type="button">Undo last import</button></div></section>
+    <section id="appearancePanel" class="appearance-panel" aria-label="Appearance" hidden>
+      <header class="appearance-header"><h2>Style</h2></header>
+      <div class="appearance-body">
+        <div class="segmented-control"><button type="button" data-theme="dark">Dark</button><button type="button" data-theme="light">Light</button></div>
+        <div class="appearance-title"><strong>Starter wallpapers</strong><span id="wallpaperCount"></span></div>
+        <div id="wallpaperGrid" class="wallpaper-grid"></div>
       </div>
-    </dialog>
+      <footer class="appearance-footer">
+        <label class="secondary-button upload-wallpaper-button">Upload Wallpaper<input id="wallpaperUpload" type="file" accept="image/png,image/jpeg,image/webp"></label>
+        <button id="moreWallpapers" class="secondary-button" type="button">More Wallpapers</button>
+      </footer>
+    </section>
 
     <div id="onboardingCard" class="onboarding-card" hidden>
       <strong>Step 1 of 3: Create your first board</strong>
