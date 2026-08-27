@@ -98,7 +98,7 @@ function createAddBoardTile() {
     const addTile = document.createElement("button");
     addTile.className = "add-board-tile";
     addTile.dataset.addBoard = "true";
-    addTile.innerHTML = '<span class="add-circle"><span class="icon-plus"></span></span><strong>Add Board</strong>';
+    addTile.innerHTML = '<span class="add-circle" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 7v10M7 12h10"></path></svg></span><strong>Add Board</strong>';
     return addTile;
 }
 

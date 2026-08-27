@@ -346,17 +346,19 @@ textarea.dark-input { min-height: 92px; padding-top: 10px; resize: vertical; }
   padding: 12px 20px;
   align-items: center;
   justify-content: center;
-  gap: 12px;
-  border: 1px dashed rgba(82, 202, 131, 0.58);
+  gap: 13px;
+  border: 2px dashed color-mix(in srgb, var(--text) 68%, transparent);
   border-radius: 8px;
-  background: var(--surface);
-  color: var(--green);
-  backdrop-filter: blur(10px);
+  background: color-mix(in srgb, var(--surface) 32%, transparent);
+  color: color-mix(in srgb, var(--text) 72%, transparent);
+  backdrop-filter: blur(4px);
   animation: reveal-board-slot 140ms ease-out;
 }
 .add-board-tile.is-visible { display: flex; }
-.add-board-tile:hover { border-color: var(--green); background: var(--surface-raised); }
-.add-circle { display: grid; width: 38px; height: 38px; place-items: center; border: 1px solid var(--green); border-radius: 50%; }
+.add-board-tile:hover { border-color: var(--text); background: color-mix(in srgb, var(--surface) 48%, transparent); color: var(--text); }
+.add-board-tile strong { font-size: 14px; font-weight: 800; text-transform: uppercase; }
+.add-circle { display: grid; width: 30px; height: 30px; flex: 0 0 30px; place-items: center; border: 2px solid currentColor; border-radius: 50%; }
+.add-circle svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; }
 @keyframes reveal-board-slot { from { opacity: 0; transform: scale(0.98); } to { opacity: 1; transform: scale(1); } }
 
 @media (hover: none) {
