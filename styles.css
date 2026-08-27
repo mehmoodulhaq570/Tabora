@@ -251,7 +251,7 @@ textarea.dark-input { min-height: 92px; padding-top: 10px; resize: vertical; }
 
 .floating-search input { width: 100%; height: 46px; border: 0; background: transparent; color: var(--text); outline: 0; }
 
-.workspace-main { padding-top: 24px; }
+.workspace-main { min-height: calc(100vh - 84px); padding-top: 24px; }
 .workspace-summary { display: flex; align-items: end; justify-content: space-between; min-height: 54px; margin-bottom: 14px; }
 .eyebrow { display: block; margin-bottom: 3px; color: var(--green); font-size: 10px; font-weight: 800; text-transform: uppercase; }
 .workspace-summary h1 { margin: 0; font-size: 24px; line-height: 1.1; }
@@ -260,9 +260,12 @@ textarea.dark-input { min-height: 92px; padding-top: 10px; resize: vertical; }
 .page-menu-button { font-size: 21px; }
 
 .board-grid {
+  position: relative;
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
+  min-height: calc(100vh - 132px);
   align-items: start;
+  align-content: start;
   gap: 14px;
 }
 
@@ -336,7 +339,9 @@ textarea.dark-input { min-height: 92px; padding-top: 10px; resize: vertical; }
 .board-footer button:hover { background: rgba(82, 202, 131, 0.1); }
 
 .add-board-tile {
-  display: flex;
+  position: absolute;
+  z-index: 5;
+  display: none;
   min-height: 72px;
   padding: 12px 20px;
   align-items: center;
@@ -347,9 +352,16 @@ textarea.dark-input { min-height: 92px; padding-top: 10px; resize: vertical; }
   background: var(--surface);
   color: var(--green);
   backdrop-filter: blur(10px);
+  animation: reveal-board-slot 140ms ease-out;
 }
+.add-board-tile.is-visible { display: flex; }
 .add-board-tile:hover { border-color: var(--green); background: var(--surface-raised); }
 .add-circle { display: grid; width: 38px; height: 38px; place-items: center; border: 1px solid var(--green); border-radius: 50%; }
+@keyframes reveal-board-slot { from { opacity: 0; transform: scale(0.98); } to { opacity: 1; transform: scale(1); } }
+
+@media (hover: none) {
+  .add-board-tile { position: static; display: flex; width: auto !important; }
+}
 .search-empty { grid-column: 1 / -1; display: grid; min-height: 260px; place-items: center; align-content: center; gap: 6px; border: 1px dashed var(--line); border-radius: 8px; background: rgba(6, 24, 19, 0.72); color: var(--muted); }
 .search-empty strong { color: var(--text); }
 

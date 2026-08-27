@@ -83,15 +83,8 @@ function renderBoards() {
   const query = nodes.globalSearch.value.trim();
   const boards = activeBoards().filter((board) => boardMatches(board, query));
   nodes.boardGrid.innerHTML = "";
-  const insertionIndex = Math.min(boardInsertionIndex, boards.length);
-  for (let index = 0; index <= boards.length; index += 1) {
-    if (!query && index === insertionIndex) nodes.boardGrid.append(createAddBoardTile());
-    if (index < boards.length) nodes.boardGrid.append(createBoardCard(boards[index], query));
-  }
-
-  if (!query && !nodes.boardGrid.querySelector(".add-board-tile")) {
-    nodes.boardGrid.append(createAddBoardTile());
-  }
+  for (const board of boards) nodes.boardGrid.append(createBoardCard(board, query));
+  if (!query) nodes.boardGrid.append(createAddBoardTile());
 
   if (!boards.length && query) {
     const empty = document.createElement("div");
@@ -474,37 +467,86 @@ nodes.boardGrid.addEventListener("drop", async (event) => {
 });
 
 let insertionFrame = null;
-nodes.boardGrid.addEventListener("pointermove", (event) => {
-  if (nodes.globalSearch.value || appState.settings.organizeMode || event.pointerType === "touch") return;
+const insertionSurface = document.querySelector(".workspace-main");
+
+function hideBoardInsertionPreview() {
+  const tile = nodes.boardGrid.querySelector(".add-board-tile");
+  if (!tile) return;
+  tile.classList.remove("is-visible");
+  tile.style.left = "";
+  tile.style.top = "";
+  tile.style.width = "";
+}
+
+function rectanglesOverlap(first, second) {
+  return first.left < second.right && first.right > second.left && first.top < second.bottom && first.bottom > second.top;
+}
+
+insertionSurface.addEventListener("pointermove", (event) => {
+  if (nodes.globalSearch.value || appState.settings.organizeMode || event.pointerType === "touch") {
+    hideBoardInsertionPreview();
+    return;
+  }
+  const pointerX = event.clientX;
+  const pointerY = event.clientY;
   cancelAnimationFrame(insertionFrame);
   insertionFrame = requestAnimationFrame(() => {
     const tile = nodes.boardGrid.querySelector(".add-board-tile");
     const cards = [...nodes.boardGrid.querySelectorAll(".board-card")];
-    if (!tile || !cards.length) return;
-
-    let nearestIndex = 0;
-    let nearestDistance = Number.POSITIVE_INFINITY;
-    cards.forEach((card, index) => {
+    if (!tile) return;
+    const gridRect = nodes.boardGrid.getBoundingClientRect();
+    const gridStyles = getComputedStyle(nodes.boardGrid);
+    const gap = parseFloat(gridStyles.columnGap) || 14;
+    const columns = gridStyles.gridTemplateColumns.split(" ").filter(Boolean);
+    const columnWidth = parseFloat(columns[0]) || Math.min(360, gridRect.width);
+    const cardRects = cards.map((card) => {
       const rect = card.getBoundingClientRect();
-      const dx = event.clientX - (rect.left + rect.width / 2);
-      const dy = event.clientY - (rect.top + rect.height / 2);
-      const distance = dx * dx + dy * dy;
-      if (distance < nearestDistance) {
-        nearestDistance = distance;
-        nearestIndex = index;
+      return { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom, width: rect.width };
+    });
+    const candidates = [];
+
+    if (!cards.length) {
+      candidates.push({ left: gridRect.left, top: gridRect.top, width: columnWidth, index: 0 });
+    }
+
+    cardRects.forEach((rect, index) => {
+      const slots = [
+        { left: rect.right + gap, top: rect.top, width: rect.width, index: index + 1 },
+        { left: rect.left, top: rect.bottom + gap, width: rect.width, index: index + columns.length }
+      ];
+      for (const slot of slots) {
+        const area = { left: slot.left, right: slot.left + slot.width, top: slot.top, bottom: slot.top + 72 };
+        const insideGrid = area.left >= gridRect.left - 1 && area.right <= gridRect.right + 1 && area.top >= gridRect.top - 1;
+        const occupied = cardRects.some((cardRect) => rectanglesOverlap(area, cardRect));
+        if (insideGrid && !occupied && !candidates.some((item) => Math.abs(item.left - slot.left) < 2 && Math.abs(item.top - slot.top) < 2)) {
+          candidates.push(slot);
+        }
       }
     });
 
-    const nearestRect = cards[nearestIndex].getBoundingClientRect();
-    const withinRow = event.clientY >= nearestRect.top - 18 && event.clientY <= nearestRect.bottom + 18;
-    const insertAfter = withinRow
-      ? event.clientX >= nearestRect.left + nearestRect.width / 2
-      : event.clientY >= nearestRect.top + nearestRect.height / 2;
-    const nextIndex = Math.max(0, Math.min(nearestIndex + (insertAfter ? 1 : 0), cards.length));
-    if (nextIndex === boardInsertionIndex) return;
-    boardInsertionIndex = nextIndex;
-    nodes.boardGrid.insertBefore(tile, cards[nextIndex] || null);
+    const hoveredSlot = candidates.find((slot) => (
+      pointerX >= slot.left - 8
+      && pointerX <= slot.left + slot.width + 8
+      && pointerY >= slot.top - 8
+      && pointerY <= slot.top + 80
+    ));
+
+    if (!hoveredSlot) {
+      hideBoardInsertionPreview();
+      return;
+    }
+
+    boardInsertionIndex = Math.max(0, Math.min(hoveredSlot.index, cards.length));
+    tile.style.left = `${hoveredSlot.left - gridRect.left}px`;
+    tile.style.top = `${hoveredSlot.top - gridRect.top}px`;
+    tile.style.width = `${hoveredSlot.width}px`;
+    tile.classList.add("is-visible");
   });
+});
+
+insertionSurface.addEventListener("pointerleave", () => {
+  cancelAnimationFrame(insertionFrame);
+  hideBoardInsertionPreview();
 });
 
 function parseTextLinks(text) {
