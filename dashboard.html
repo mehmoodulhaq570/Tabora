@@ -43,10 +43,11 @@
 
     <dialog id="pageDialog" class="app-dialog page-dialog">
       <form id="pageForm">
-        <header class="dialog-header"><h2>Add New Page</h2><button class="dialog-close" type="button" data-close-dialog="pageDialog" aria-label="Close">&times;</button></header>
+        <header class="dialog-header"><h2 id="pageDialogTitle">Add New Page</h2><button class="dialog-close" type="button" data-close-dialog="pageDialog" aria-label="Close">&times;</button></header>
         <label for="pageName">Page Name <span aria-hidden="true">*</span></label>
         <input id="pageName" class="dark-input" placeholder="Enter page name..." maxlength="40" autocomplete="off" required>
-        <footer class="dialog-footer"><button class="secondary-button" type="button" data-close-dialog="pageDialog">Cancel</button><button class="accent-button" type="submit">Create Page</button></footer>
+        <input id="editingPageId" type="hidden">
+        <footer class="dialog-footer"><button class="secondary-button" type="button" data-close-dialog="pageDialog">Cancel</button><button id="pageSubmitButton" class="accent-button" type="submit">Create Page</button></footer>
       </form>
     </dialog>
 

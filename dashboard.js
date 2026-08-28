@@ -3,6 +3,9 @@ const nodes = {
   pageDialog: document.querySelector("#pageDialog"),
   pageForm: document.querySelector("#pageForm"),
   pageName: document.querySelector("#pageName"),
+  pageDialogTitle: document.querySelector("#pageDialogTitle"),
+  pageSubmitButton: document.querySelector("#pageSubmitButton"),
+  editingPageId: document.querySelector("#editingPageId"),
   searchPanel: document.querySelector("#searchPanel"),
   globalSearch: document.querySelector("#globalSearch"),
   boardGrid: document.querySelector("#boardGrid"),
@@ -215,11 +218,36 @@ function renderOnboarding() {
   nodes.onboardingCard.hidden = appState.settings.onboardingComplete || appState.boards.length > 0;
 }
 
-function showToast(message) {
+function showToast(message, tone = "") {
   clearTimeout(toastTimer);
-  nodes.toast.textContent = message;
+  const isWarning = tone === "warning" || (!tone && /cannot|could not|unavailable|invalid|not granted|no new|enter a valid|smaller than/i.test(message));
+  nodes.toast.className = `toast ${isWarning ? "toast-warning" : "toast-success"}`;
+  const icon = document.createElement("span");
+  icon.className = "toast-icon";
+  icon.setAttribute("aria-hidden", "true");
+  icon.innerHTML = isWarning
+    ? '<svg viewBox="0 0 24 24"><path d="M12 3 2.7 20h18.6L12 3Z"></path><path d="M12 9v5M12 17.5h.01"></path></svg>'
+    : '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"></circle><path d="m8 12 2.7 2.7L16.5 9"></path></svg>';
+  const copy = document.createElement("span");
+  copy.className = "toast-copy";
+  copy.textContent = message;
+  nodes.toast.replaceChildren(icon, copy);
   nodes.toast.hidden = false;
-  toastTimer = setTimeout(() => { nodes.toast.hidden = true; }, 2800);
+  requestAnimationFrame(() => nodes.toast.classList.add("is-visible"));
+  toastTimer = setTimeout(() => {
+    nodes.toast.classList.remove("is-visible");
+    setTimeout(() => { if (!nodes.toast.classList.contains("is-visible")) nodes.toast.hidden = true; }, 220);
+  }, 3600);
+}
+
+function openPageDialog(page = null) {
+  nodes.editingPageId.value = page?.id || "";
+  nodes.pageName.value = page?.name || "";
+  nodes.pageDialogTitle.textContent = page ? "Rename Page" : "Add New Page";
+  nodes.pageSubmitButton.textContent = page ? "Save Changes" : "Create Page";
+  nodes.pageDialog.showModal();
+  nodes.pageName.focus();
+  if (page) nodes.pageName.select();
 }
 
 function openBoardDialog(board = null) {
@@ -451,7 +479,7 @@ async function copyPageLinks(page) {
 
 function pageMenuItems(page) {
   return [
-    { icon: "&#9998;", label: "Rename", action: async () => { const name = window.prompt("Page name", page.name); if (name) { await renamePage(page.id, name); await refresh("Page renamed"); } } },
+    { icon: "&#9998;", label: "Rename", action: () => openPageDialog(page) },
     { icon: "&#128279;", label: "Share Page", action: () => copyPageLinks(page) },
     { separator: true },
     { icon: "&#128465;", label: "Delete", danger: true, action: async () => {
@@ -494,18 +522,19 @@ nodes.pageTabs.addEventListener("contextmenu", (event) => {
 });
 
 document.querySelector("#addPageButton").addEventListener("click", () => {
-  nodes.pageName.value = "";
-  nodes.pageDialog.showModal();
-  nodes.pageName.focus();
+  openPageDialog();
 });
 
 nodes.pageForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (!nodes.pageName.value.trim()) return;
-  await addPage(nodes.pageName.value);
+  const editingPageId = nodes.editingPageId.value;
+  if (editingPageId) await renamePage(editingPageId, nodes.pageName.value);
+  else await addPage(nodes.pageName.value);
   nodes.pageName.value = "";
+  nodes.editingPageId.value = "";
   nodes.pageDialog.close();
-  await refresh("Page created");
+  await refresh(editingPageId ? "Page renamed" : "Page created");
 });
 
 function openInlineBoardEditor(tile) {
