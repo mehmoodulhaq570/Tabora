@@ -813,6 +813,28 @@ function clearOrganizeDropIndicator() {
   organizeDropTarget = null;
 }
 
+function captureBoardRects() {
+  return new Map([...nodes.boardGrid.querySelectorAll(".board-card")].map((card) => [card.dataset.boardId, card.getBoundingClientRect()]));
+}
+
+function animateBoardReflow(previousRects) {
+  for (const card of nodes.boardGrid.querySelectorAll(".board-card")) {
+    const previous = previousRects.get(card.dataset.boardId);
+    if (!previous) continue;
+    const current = card.getBoundingClientRect();
+    const deltaX = previous.left - current.left;
+    const deltaY = previous.top - current.top;
+    if (Math.abs(deltaX) < 1 && Math.abs(deltaY) < 1) continue;
+    card.animate(
+      [
+        { transform: `translate(${deltaX}px, ${deltaY}px)` },
+        { transform: "translate(0, 0)" }
+      ],
+      { duration: 340, easing: "cubic-bezier(0.22, 1, 0.36, 1)" }
+    );
+  }
+}
+
 function showOrganizeDropIndicator(event) {
   if (draggedItem?.type !== "board") { clearOrganizeDropIndicator(); return; }
   const columns = [...nodes.boardGrid.querySelectorAll("[data-board-column]")];
@@ -864,20 +886,23 @@ nodes.boardGrid.addEventListener("dragover", (event) => {
 });
 nodes.boardGrid.addEventListener("drop", async (event) => {
   event.preventDefault();
+  const droppedItem = draggedItem;
+  const previousBoardRects = captureBoardRects();
   const targetBoard = event.target.closest(".board-card");
   const targetColumn = event.target.closest("[data-board-column]");
-  if (!draggedItem) return;
-  if (draggedItem.type === "board" && organizeDropTarget?.beforeBoardId) await reorderBoard(draggedItem.id, organizeDropTarget.beforeBoardId);
-  else if (draggedItem.type === "board" && organizeDropTarget) await moveBoardToColumn(draggedItem.id, organizeDropTarget.column);
-  else if (draggedItem.type === "board" && targetBoard) await reorderBoard(draggedItem.id, targetBoard.dataset.boardId);
-  else if (draggedItem.type === "board" && targetColumn) await moveBoardToColumn(draggedItem.id, Number(targetColumn.dataset.boardColumn));
-  if (draggedItem.type === "link") {
+  if (!droppedItem) return;
+  if (droppedItem.type === "board" && organizeDropTarget?.beforeBoardId) await reorderBoard(droppedItem.id, organizeDropTarget.beforeBoardId);
+  else if (droppedItem.type === "board" && organizeDropTarget) await moveBoardToColumn(droppedItem.id, organizeDropTarget.column);
+  else if (droppedItem.type === "board" && targetBoard) await reorderBoard(droppedItem.id, targetBoard.dataset.boardId);
+  else if (droppedItem.type === "board" && targetColumn) await moveBoardToColumn(droppedItem.id, Number(targetColumn.dataset.boardColumn));
+  if (droppedItem.type === "link") {
     if (!targetBoard) return;
     const targetLink = event.target.closest(".bookmark-row");
-    await moveLink(draggedItem.id, draggedItem.boardId, targetBoard.dataset.boardId, targetLink?.dataset.linkId || null);
+    await moveLink(droppedItem.id, droppedItem.boardId, targetBoard.dataset.boardId, targetLink?.dataset.linkId || null);
   }
   clearOrganizeDropIndicator();
   await refresh();
+  animateBoardReflow(previousBoardRects);
 });
 
 let insertionFrame = null;
