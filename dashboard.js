@@ -21,6 +21,7 @@ const nodes = {
   linkNote: document.querySelector("#linkNote"),
   linkBoardId: document.querySelector("#linkBoardId"),
   editingLinkId: document.querySelector("#editingLinkId"),
+  deleteConfirmDialog: document.querySelector("#deleteConfirmDialog"),
   importDialog: document.querySelector("#importDialog"),
   textImportPanel: document.querySelector("#textImportPanel"),
   importText: document.querySelector("#importText"),
@@ -43,6 +44,7 @@ let boardInsertionPlacement = { column: 0, order: 0 };
 let organizeSnapshot = null;
 let organizeDropTarget = null;
 const selectedOrganizeLinks = new Set();
+let deleteConfirmationResolve = null;
 
 const ORGANIZE_TOOL_ICON = '<svg class="rail-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="6" height="6" rx="1"></rect><rect x="14" y="3" width="6" height="6" rx="1"></rect><rect x="3" y="14" width="6" height="6" rx="1"></rect><path d="m13.5 17 2.2 2.2 4.8-5"></path></svg>';
 const ORGANIZE_DONE_ICON = '<svg class="rail-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4.5 4.5L19 7"></path></svg>';
@@ -272,6 +274,35 @@ function showToast(message, tone = "") {
   }, 3600);
 }
 
+function requestDeleteConfirmation({ title, prompt, warning = "", caution = "This action cannot be undone.", compact = false }) {
+  if (deleteConfirmationResolve) settleDeleteConfirmation(false);
+  nodes.deleteConfirmDialog.classList.toggle("compact", compact);
+  document.querySelector("#deleteConfirmTitle").textContent = title;
+  document.querySelector("#deleteConfirmPrompt").textContent = prompt;
+  const warningNode = document.querySelector("#deleteConfirmWarning");
+  warningNode.textContent = warning;
+  warningNode.hidden = !warning;
+  const cautionNode = document.querySelector("#deleteConfirmCaution");
+  cautionNode.textContent = caution;
+  cautionNode.hidden = !caution;
+  nodes.deleteConfirmDialog.showModal();
+  return new Promise((resolve) => { deleteConfirmationResolve = resolve; });
+}
+
+function settleDeleteConfirmation(confirmed) {
+  const resolve = deleteConfirmationResolve;
+  deleteConfirmationResolve = null;
+  if (nodes.deleteConfirmDialog.open) nodes.deleteConfirmDialog.close();
+  resolve?.(confirmed);
+}
+
+document.querySelector("#deleteConfirmCancel").addEventListener("click", () => settleDeleteConfirmation(false));
+document.querySelector("#deleteConfirmSubmit").addEventListener("click", () => settleDeleteConfirmation(true));
+nodes.deleteConfirmDialog.addEventListener("cancel", (event) => {
+  event.preventDefault();
+  settleDeleteConfirmation(false);
+});
+
 function openPageDialog(page = null) {
   nodes.editingPageId.value = page?.id || "";
   nodes.pageName.value = page?.name || "";
@@ -465,7 +496,16 @@ function boardMenuItems(board) {
   for (const page of otherPages) {
     items.push({ icon: BOARD_MENU_ICONS.move, label: `Move to ${page.name}`, action: async () => { await moveBoard(board.id, page.id); await refresh("Board moved"); } });
   }
-  items.push({ separator: true }, { icon: PAGE_MENU_ICONS.delete, label: "Delete board", danger: true, action: async () => { await deleteBoard(board.id); await refresh("Board moved to Trash"); } });
+  items.push({ separator: true }, { icon: PAGE_MENU_ICONS.delete, label: "Delete board", danger: true, action: async () => {
+    const confirmed = await requestDeleteConfirmation({
+      title: "Move to Trash",
+      prompt: `Move "${board.name}" to trash?`,
+      warning: `The board and its ${board.links.length} ${board.links.length === 1 ? "bookmark" : "bookmarks"} will be moved to trash. You can restore them within 30 days.`
+    });
+    if (!confirmed) return;
+    await deleteBoard(board.id);
+    await refresh("Board moved to Trash");
+  } });
   return items;
 }
 
@@ -516,11 +556,18 @@ function pageMenuItems(page) {
     { separator: true },
     { icon: PAGE_MENU_ICONS.delete, label: "Delete", danger: true, action: async () => {
       if (page.protected) { showToast("The Home page cannot be deleted"); return; }
-      if (window.confirm(`Delete ${page.name} and move its boards to Trash?`)) {
-        await deletePage(page.id);
-        boardInsertionPlacement = { column: 0, order: 0 };
-        await refresh("Page deleted");
-      }
+      const boardCount = appState.boards.filter((board) => board.pageId === page.id).length;
+      const confirmed = await requestDeleteConfirmation({
+        title: `Delete "${page.name}"?`,
+        prompt: `This will move the page and all ${boardCount} ${boardCount === 1 ? "board" : "boards"} to trash. You can restore them within 30 days.`,
+        warning: "",
+        caution: "",
+        compact: true
+      });
+      if (!confirmed) return;
+      await deletePage(page.id);
+      boardInsertionPlacement = { column: 0, order: 0 };
+      await refresh("Page deleted");
     } }
   ];
 }
@@ -634,9 +681,18 @@ nodes.boardGrid.addEventListener("click", async (event) => {
     const link = board?.links.find((item) => item.id === editLinkButton.dataset.editLink);
     if (link) openLinkDialog(board.id, link);
   }
-  if (deleteLinkButton && window.confirm("Delete this link?")) {
+  if (deleteLinkButton) {
+    const board = appState.boards.find((item) => item.id === deleteLinkButton.dataset.boardId);
+    const link = board?.links.find((item) => item.id === deleteLinkButton.dataset.deleteLink);
+    if (!board || !link) return;
+    const confirmed = await requestDeleteConfirmation({
+      title: "Move to Trash",
+      prompt: `Move "${link.title}" to trash?`,
+      warning: "This bookmark will be moved to trash. You can restore it within 30 days."
+    });
+    if (!confirmed) return;
     await deleteLink(deleteLinkButton.dataset.boardId, deleteLinkButton.dataset.deleteLink);
-    await refresh("Link deleted");
+    await refresh("Bookmark moved to Trash");
   }
 });
 
@@ -721,6 +777,13 @@ document.querySelector("#organizeDone").addEventListener("click", finishOrganize
 document.querySelector("#organizeCancel").addEventListener("click", cancelOrganizeMode);
 document.querySelector("#organizeDelete").addEventListener("click", async () => {
   if (!selectedOrganizeLinks.size) return;
+  const selectedCount = selectedOrganizeLinks.size;
+  const confirmed = await requestDeleteConfirmation({
+    title: "Move to Trash",
+    prompt: `Move ${selectedCount} selected ${selectedCount === 1 ? "bookmark" : "bookmarks"} to trash?`,
+    warning: `${selectedCount === 1 ? "This bookmark" : "These bookmarks"} will be moved to trash. You can restore ${selectedCount === 1 ? "it" : "them"} within 30 days.`
+  });
+  if (!confirmed) return;
   await updateTaboraState((state) => {
     for (const board of state.boards) {
       const page = state.pages.find((item) => item.id === board.pageId);

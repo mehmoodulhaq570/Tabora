@@ -72,6 +72,19 @@
       </form>
     </dialog>
 
+    <dialog id="deleteConfirmDialog" class="app-dialog delete-confirm-dialog">
+      <div class="delete-confirm-content">
+        <h2 id="deleteConfirmTitle">Move to Trash</h2>
+        <p id="deleteConfirmPrompt"></p>
+        <div id="deleteConfirmWarning" class="delete-confirm-warning"></div>
+        <strong id="deleteConfirmCaution" class="delete-confirm-caution">This action cannot be undone.</strong>
+        <footer class="delete-confirm-actions">
+          <button id="deleteConfirmCancel" class="delete-confirm-cancel" type="button">Cancel</button>
+          <button id="deleteConfirmSubmit" class="delete-confirm-submit" type="button">Delete</button>
+        </footer>
+      </div>
+    </dialog>
+
     <dialog id="importDialog" class="app-dialog wide-dialog">
       <form id="importForm">
         <header class="dialog-header"><div><span class="eyebrow">Bring your links</span><h2>Import to Tabora</h2></div><button class="dialog-close" type="button" data-close-dialog="importDialog" aria-label="Close">&times;</button></header>

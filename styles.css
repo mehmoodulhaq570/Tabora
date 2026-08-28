@@ -533,6 +533,20 @@ textarea.dark-input { min-height: 92px; padding-top: 10px; resize: vertical; }
 .page-dialog .dark-input { min-height: 58px; font-size: 15px; }
 .page-dialog .dialog-footer { margin-top: 16px; }
 
+.delete-confirm-dialog { width: min(570px, calc(100% - 32px)); overflow: hidden; }
+.delete-confirm-content { display: grid; padding: 36px; gap: 22px; }
+.delete-confirm-content h2 { margin: 0; font-size: 25px; }
+.delete-confirm-content p { margin: 2px 0 -4px; color: var(--muted); font-size: 14px; line-height: 1.5; }
+.delete-confirm-warning { padding: 16px 20px; border: 1px solid color-mix(in srgb, var(--danger) 48%, var(--line)); border-radius: 10px; background: color-mix(in srgb, var(--danger) 11%, transparent); color: var(--danger); font-size: 15px; line-height: 1.5; }
+.delete-confirm-warning[hidden], .delete-confirm-caution[hidden] { display: none; }
+.delete-confirm-caution { color: var(--danger); font-size: 14px; font-weight: 600; }
+.delete-confirm-actions { display: flex; margin-top: 4px; justify-content: flex-end; gap: 14px; }
+.delete-confirm-actions button { min-width: 114px; min-height: 54px; padding: 0 22px; border: 1px solid var(--line); border-radius: 10px; font-size: 15px; font-weight: 650; }
+.delete-confirm-cancel { background: var(--surface-raised); color: var(--text); }
+.delete-confirm-submit { border-color: color-mix(in srgb, var(--danger) 45%, var(--line)) !important; background: color-mix(in srgb, var(--danger) 13%, transparent); color: var(--danger); }
+.delete-confirm-actions button:hover { border-color: currentColor; filter: brightness(1.08); }
+.delete-confirm-dialog.compact .delete-confirm-content { gap: 20px; }
+
 .settings-dialog {
   width: min(1000px, calc(100% - 40px));
   height: min(700px, calc(100vh - 40px));
@@ -877,6 +891,8 @@ body[data-palette="amber"] {
   .trash-dialog-header { align-items: flex-start; flex-direction: column; gap: 7px; }
   .trash-row { align-items: stretch; flex-direction: column; }
   .trash-row-actions button { flex: 1; }
+  .delete-confirm-content { padding: 26px 22px; }
+  .delete-confirm-actions button { min-width: 0; flex: 1; }
   .settings-layout { grid-template-columns: 1fr; grid-template-rows: auto minmax(0, 1fr); }
   .settings-sidebar { border-right: 0; border-bottom: 1px solid var(--line); }
   .settings-sidebar h2 { height: 56px; padding: 16px 18px; }
