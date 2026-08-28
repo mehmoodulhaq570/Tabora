@@ -76,10 +76,10 @@
       <form id="importForm">
         <header class="dialog-header"><div><span class="eyebrow">Bring your links</span><h2>Import to Tabora</h2></div><button class="dialog-close" type="button" data-close-dialog="importDialog" aria-label="Close">&times;</button></header>
         <div class="import-options">
-          <button class="import-option" type="button" data-import="bookmarks"><span class="icon-bookmark"></span><strong>Browser bookmarks</strong><small>Copy folders and bookmarks from Brave</small></button>
-          <button class="import-option" type="button" data-import="window"><span class="icon-window"></span><strong>Current window</strong><small>Turn every open tab into one board</small></button>
-          <button class="import-option" type="button" data-import="text"><span class="icon-paste"></span><strong>Paste links</strong><small>One URL per line, optionally title | URL</small></button>
-          <label class="import-option file-option"><span class="icon-file"></span><strong>Upload a file</strong><small>HTML, CSV, or text</small><input id="importFile" type="file" accept=".html,.htm,.csv,.txt"></label>
+          <button class="import-option" type="button" data-import="bookmarks"><svg class="option-svg-icon icon-amber" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4.5A2.5 2.5 0 0 1 8.5 2H19v17H8.5A2.5 2.5 0 0 0 6 21.5v-17Z"></path><path d="M6 19V4.5A2.5 2.5 0 0 0 3.5 2H3v17h3ZM13 6v7l2-1.4 2 1.4V6"></path></svg><strong>Browser bookmarks</strong><small>Copy folders and bookmarks from Brave</small></button>
+          <button class="import-option" type="button" data-import="window"><svg class="option-svg-icon icon-blue" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"></rect><path d="M3 8h18M7 6h.01M10 6h.01"></path></svg><strong>Current window</strong><small>Turn every open tab into one board</small></button>
+          <button class="import-option" type="button" data-import="text"><svg class="option-svg-icon icon-green" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2"></rect><path d="M9 4V2h6v2M8 9h8M8 13h8M8 17h5"></path></svg><strong>Paste links</strong><small>One URL per line, optionally title | URL</small></button>
+          <label class="import-option file-option"><svg class="option-svg-icon icon-purple" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2h8l4 4v16H6V2Z"></path><path d="M14 2v5h5M9 12h6M9 16h6"></path></svg><strong>Upload a file</strong><small>HTML, CSV, or text</small><input id="importFile" type="file" accept=".html,.htm,.csv,.txt"></label>
         </div>
         <div id="textImportPanel" class="text-import-panel" hidden>
           <label for="importText">Links to import</label>
@@ -120,10 +120,10 @@
         <aside class="settings-sidebar">
           <h2>Settings</h2>
           <nav aria-label="Settings sections">
-            <button class="settings-nav-button active" type="button" data-settings-view="general"><span class="icon-settings"></span>General</button>
-            <button class="settings-nav-button" type="button" data-settings-view="account"><span class="settings-nav-icon">&#9675;</span>Account</button>
-            <button class="settings-nav-button" type="button" data-settings-view="language"><span class="settings-nav-icon">&#9678;</span>Language</button>
-            <button class="settings-nav-button" type="button" data-settings-view="support"><span class="settings-nav-icon">?</span>Support</button>
+            <button class="settings-nav-button active" type="button" data-settings-view="general"><svg class="settings-nav-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M18.7 5.3l-2.1 2.1M7.4 16.6l-2.1 2.1"></path></svg>General</button>
+            <button class="settings-nav-button" type="button" data-settings-view="account"><svg class="settings-nav-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M5 21a7 7 0 0 1 14 0"></path></svg>Account</button>
+            <button class="settings-nav-button" type="button" data-settings-view="language"><svg class="settings-nav-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"></path></svg>Language</button>
+            <button class="settings-nav-button" type="button" data-settings-view="support"><svg class="settings-nav-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="3"></circle><path d="m5.6 5.6 4.3 4.3M14.1 14.1l4.3 4.3M18.4 5.6l-4.3 4.3M9.9 14.1l-4.3 4.3"></path></svg>Support</button>
           </nav>
         </aside>
         <div class="settings-content">

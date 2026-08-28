@@ -55,6 +55,12 @@ const PAGE_MENU_ICONS = {
   delete: '<svg class="menu-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 14h10l1-14M10 11v6M14 11v6"></path></svg>'
 };
 
+const BOARD_MENU_ICONS = {
+  open: '<svg class="menu-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6M20 4 11 13"></path><path d="M18 13v6a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h6"></path></svg>',
+  add: '<svg class="menu-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13a4.5 4.5 0 0 0 6.4.1l2-2a4.5 4.5 0 0 0-6.3-6.4l-1.2 1.2"></path><path d="M14 11a4.5 4.5 0 0 0-6.4-.1l-2 2a4.5 4.5 0 0 0 6.3 6.4l1.2-1.2M19 16v5M16.5 18.5h5"></path></svg>',
+  move: '<svg class="menu-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M14 7l5 5-5 5"></path></svg>'
+};
+
 async function init() {
   appState = await getTaboraState();
   await applyAppearance();
@@ -91,7 +97,7 @@ function renderPages() {
     options.dataset.pageOptions = page.id;
     options.title = `${page.name} options`;
     options.setAttribute("aria-label", `${page.name} options`);
-    options.innerHTML = '<span aria-hidden="true">&#9662;</span>';
+    options.innerHTML = '<svg class="page-chevron-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m8 10 4 4 4-4"></path></svg>';
     item.append(button, options);
     nodes.pageTabs.append(item);
   }
@@ -144,10 +150,10 @@ function createBoardCard(board, query) {
   const header = document.createElement("header");
   header.className = "board-header";
   header.innerHTML = `
-    <div class="board-title"><span class="drag-grip" aria-hidden="true">&#8942;&#8942;</span><h2></h2></div>
+    <div class="board-title"><svg class="drag-grip" viewBox="0 0 18 18" aria-hidden="true"><circle cx="5" cy="4" r="1"></circle><circle cx="13" cy="4" r="1"></circle><circle cx="5" cy="9" r="1"></circle><circle cx="13" cy="9" r="1"></circle><circle cx="5" cy="14" r="1"></circle><circle cx="13" cy="14" r="1"></circle></svg><h2></h2></div>
     <div class="board-actions">
-      <button class="board-icon-button" data-add-link="${board.id}" title="Add link" aria-label="Add link"><span class="icon-link-plus"></span></button>
-      <button class="board-icon-button" data-board-menu="${board.id}" title="Board options" aria-label="Board options">&vellip;</button>
+      <button class="board-icon-button" data-add-link="${board.id}" title="Add link" aria-label="Add link"><svg class="board-action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13a4.5 4.5 0 0 0 6.4.1l2-2a4.5 4.5 0 0 0-6.3-6.4l-1.2 1.2"></path><path d="M14 11a4.5 4.5 0 0 0-6.4-.1l-2 2a4.5 4.5 0 0 0 6.3 6.4l1.2-1.2"></path><path class="icon-accent" d="M19 16v5M16.5 18.5h5"></path></svg></button>
+      <button class="board-icon-button" data-board-menu="${board.id}" title="Board options" aria-label="Board options"><svg class="board-action-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg></button>
     </div>`;
   setText(header, "h2", board.name);
   card.append(header);
@@ -200,7 +206,7 @@ function createLinkRow(board, link) {
 
   const actions = document.createElement("span");
   actions.className = "link-actions";
-  actions.innerHTML = `<button data-edit-link="${link.id}" data-board-id="${board.id}" title="Edit link" aria-label="Edit link">&#9998;</button><button data-delete-link="${link.id}" data-board-id="${board.id}" title="Delete link" aria-label="Delete link">&times;</button>`;
+  actions.innerHTML = `<button data-edit-link="${link.id}" data-board-id="${board.id}" title="Edit link" aria-label="Edit link"><svg class="link-action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4l11-11-4-4L4 16v4Z"></path><path d="m13.5 6.5 4 4"></path></svg></button><button data-delete-link="${link.id}" data-board-id="${board.id}" title="Delete link" aria-label="Delete link"><svg class="link-action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 14h10l1-14M10 11v6M14 11v6"></path></svg></button>`;
   row.append(anchor, actions);
   return row;
 }
@@ -242,7 +248,7 @@ function showToast(message, tone = "") {
   requestAnimationFrame(() => nodes.toast.classList.add("is-visible"));
   toastTimer = setTimeout(() => {
     nodes.toast.classList.remove("is-visible");
-    setTimeout(() => { if (!nodes.toast.classList.contains("is-visible")) nodes.toast.hidden = true; }, 220);
+    setTimeout(() => { if (!nodes.toast.classList.contains("is-visible")) nodes.toast.hidden = true; }, 360);
   }, 3600);
 }
 
@@ -430,16 +436,16 @@ function showContextMenu(anchor, items) {
 
 function boardMenuItems(board) {
   const items = [
-    { icon: "&#8599;", label: "Open all links", action: () => openBoard(board) },
-    { icon: "+", label: "Add link", action: () => openInlineLinkEditor(board.id) },
-    { icon: "&#9998;", label: "Rename board", action: () => openBoardDialog(board) },
-    { icon: "&#128203;", label: "Share / copy links", action: () => copyBoardLinks(board) }
+    { icon: BOARD_MENU_ICONS.open, label: "Open all links", action: () => openBoard(board) },
+    { icon: BOARD_MENU_ICONS.add, label: "Add link", action: () => openInlineLinkEditor(board.id) },
+    { icon: PAGE_MENU_ICONS.rename, label: "Rename board", action: () => openBoardDialog(board) },
+    { icon: PAGE_MENU_ICONS.share, label: "Share / copy links", action: () => copyBoardLinks(board) }
   ];
   const otherPages = ordered(appState.pages).filter((page) => page.id !== board.pageId);
   for (const page of otherPages) {
-    items.push({ icon: "&#8594;", label: `Move to ${page.name}`, action: async () => { await moveBoard(board.id, page.id); await refresh("Board moved"); } });
+    items.push({ icon: BOARD_MENU_ICONS.move, label: `Move to ${page.name}`, action: async () => { await moveBoard(board.id, page.id); await refresh("Board moved"); } });
   }
-  items.push({ separator: true }, { icon: "&#128465;", label: "Delete board", danger: true, action: async () => { await deleteBoard(board.id); await refresh("Board moved to Trash"); } });
+  items.push({ separator: true }, { icon: PAGE_MENU_ICONS.delete, label: "Delete board", danger: true, action: async () => { await deleteBoard(board.id); await refresh("Board moved to Trash"); } });
   return items;
 }
 
