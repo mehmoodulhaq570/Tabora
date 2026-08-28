@@ -318,9 +318,11 @@ textarea.dark-input { min-height: 92px; padding-top: 10px; resize: vertical; }
 }
 
 .board-card:hover { border-color: rgba(190, 196, 194, 0.34); background: color-mix(in srgb, var(--surface) 84%, transparent); transform: translateY(-1px); }
-.board-card.dragging, .bookmark-row.dragging { opacity: 0.45; }
+.board-card.dragging, .bookmark-row.dragging { opacity: 0.35; }
 .organize-mode .board-card { cursor: grab; }
 .organize-mode .board-card:active { cursor: grabbing; }
+.organize-mode .board-column { min-height: calc(100vh - 180px); }
+.organize-drop-indicator { position: absolute; z-index: 20; height: 4px; border-radius: 4px; background: var(--green); box-shadow: 0 0 14px color-mix(in srgb, var(--green) 75%, transparent); pointer-events: none; transform: translateY(-2px); }
 
 .board-header {
   display: flex;
@@ -359,6 +361,8 @@ textarea.dark-input { min-height: 92px; padding-top: 10px; resize: vertical; }
 .board-links { display: grid; gap: 3px; min-height: 70px; padding: 12px 18px 16px; }
 .bookmark-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; min-width: 0; min-height: 43px; border: 0; border-radius: 6px; background: transparent; }
 .bookmark-row:hover { background: color-mix(in srgb, var(--green) 9%, transparent); }
+.organize-mode .bookmark-row { cursor: pointer; }
+.organize-mode .bookmark-row.selected { background: color-mix(in srgb, var(--green) 19%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--green) 68%, transparent); }
 .bookmark-row > a { display: grid; grid-template-columns: 24px minmax(0, 1fr); align-items: center; gap: 12px; min-width: 0; padding: 7px 6px; color: var(--text); text-decoration: none; }
 .bookmark-copy { display: grid; min-width: 0; gap: 1px; }
 .bookmark-copy strong, .bookmark-copy small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -468,6 +472,7 @@ textarea.dark-input { min-height: 92px; padding-top: 10px; resize: vertical; }
 .rail-button:hover { border-color: var(--green); transform: scale(1.04); }
 .rail-button.active, .accent-rail { border-color: var(--green); background: var(--green); color: var(--green-dark); }
 #incognitoTool.active { border-color: #8b5cf6; background: #7c3aed; color: #fff; box-shadow: 0 0 0 1px rgba(139, 92, 246, 0.45), 0 0 24px rgba(124, 58, 237, 0.68); }
+.organize-mode #organizeTool { color: var(--green-dark); box-shadow: 0 0 0 1px color-mix(in srgb, var(--green) 40%, transparent), 0 0 24px color-mix(in srgb, var(--green) 55%, transparent); }
 .accent-rail { box-shadow: 0 0 0 1px color-mix(in srgb, var(--green) 40%, transparent), 0 0 24px color-mix(in srgb, var(--green) 55%, transparent); }
 .rail-icon { width: 27px; height: 27px; overflow: visible; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
 .rail-icon-incognito { width: 29px; height: 29px; }
@@ -667,6 +672,18 @@ textarea.dark-input { min-height: 92px; padding-top: 10px; resize: vertical; }
 .onboarding-card { position: fixed; left: max(24px, calc((100vw - min(1320px, calc(100vw - 148px))) / 2)); bottom: 28px; z-index: 35; width: min(390px, calc(100% - 48px)); padding: 16px; border: 1px solid var(--line-strong); border-radius: 8px; background: rgba(5, 22, 18, 0.97); box-shadow: var(--shadow); }
 .onboarding-card p { margin: 7px 0 13px; color: var(--muted); font-size: 12px; }
 .onboarding-card .secondary-button { float: right; }
+.organize-toolbar { position: fixed; right: 50%; bottom: 18px; z-index: 70; display: flex; width: min(810px, calc(100% - 48px)); min-height: 64px; padding: 10px 18px 10px 24px; align-items: center; gap: 18px; border: 1px solid var(--line-strong); border-radius: 14px; background: color-mix(in srgb, var(--surface-solid) 96%, black 4%); color: var(--muted); box-shadow: 0 18px 48px rgba(0, 0, 0, 0.34); backdrop-filter: blur(18px); transform: translateX(50%); }
+.organize-toolbar[hidden] { display: none; }
+.organize-hint { flex: 1 1 auto; font-size: 13px; }
+.organize-hint i { display: inline-block; width: 4px; height: 4px; margin: 0 7px 2px; border-radius: 50%; background: currentColor; }
+.organize-toolbar > strong { flex: 0 0 auto; color: var(--green); font-size: 13px; font-weight: 600; }
+.organize-toolbar-actions { display: flex; gap: 10px; }
+.organize-toolbar button { min-width: 82px; min-height: 42px; padding: 0 16px; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: var(--text); font-weight: 600; }
+.organize-toolbar button:disabled { color: color-mix(in srgb, var(--danger) 35%, var(--muted)); cursor: default; opacity: 0.55; }
+.organize-toolbar .organize-delete:not(:disabled) { border-color: color-mix(in srgb, var(--danger) 45%, var(--line)); color: var(--danger); }
+.organize-toolbar .organize-cancel { background: color-mix(in srgb, var(--page-bg) 78%, black 22%); }
+.organize-toolbar .organize-done { border-color: color-mix(in srgb, var(--green) 55%, var(--line)); color: var(--green); }
+.organize-toolbar button:not(:disabled):hover { border-color: currentColor; background: color-mix(in srgb, currentColor 8%, transparent); }
 .toast { position: fixed; top: 12px; right: 28px; z-index: 100; display: grid; grid-template-columns: 24px minmax(0, 1fr); width: min(450px, calc(100% - 32px)); min-height: 82px; padding: 18px 22px; align-items: center; gap: 14px; border: 1px solid var(--line-strong); border-left: 3px solid var(--green); border-radius: 8px; background: color-mix(in srgb, var(--surface-solid) 96%, black 4%); color: var(--text); box-shadow: var(--shadow); opacity: 0; transform: translateX(calc(100% + 40px)) scale(0.98); transition: opacity 180ms linear, transform 340ms cubic-bezier(0.2, 0, 0, 1); will-change: opacity, transform; }
 .toast.is-visible { opacity: 1; transform: translateX(0) scale(1); }
 .toast-warning { border-left-color: #f5bd00; }
@@ -834,6 +851,10 @@ body[data-palette="amber"] {
   .eyebrow { display: none; }
   .import-options { grid-template-columns: 1fr; }
   .tool-rail { overflow-x: auto; justify-content: start; }
+  .organize-toolbar { bottom: 68px; flex-wrap: wrap; gap: 9px; padding: 12px; }
+  .organize-hint { flex-basis: 100%; }
+  .organize-toolbar-actions { flex: 1; }
+  .organize-toolbar button { min-width: 0; flex: 1; }
   .settings-layout { grid-template-columns: 1fr; grid-template-rows: auto minmax(0, 1fr); }
   .settings-sidebar { border-right: 0; border-bottom: 1px solid var(--line); }
   .settings-sidebar h2 { height: 56px; padding: 16px 18px; }

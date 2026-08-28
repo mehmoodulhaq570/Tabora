@@ -40,6 +40,12 @@ let wallpaperPreviewUrls = [];
 let toastTimer = null;
 let pendingImportGroups = [];
 let boardInsertionPlacement = { column: 0, order: 0 };
+let organizeSnapshot = null;
+let organizeDropTarget = null;
+const selectedOrganizeLinks = new Set();
+
+const ORGANIZE_TOOL_ICON = '<svg class="rail-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="6" height="6" rx="1"></rect><rect x="14" y="3" width="6" height="6" rx="1"></rect><rect x="3" y="14" width="6" height="6" rx="1"></rect><path d="m13.5 17 2.2 2.2 4.8-5"></path></svg>';
+const ORGANIZE_DONE_ICON = '<svg class="rail-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4.5 4.5L19 7"></path></svg>';
 
 const WALLPAPERS = [
   { id: "none", name: "Default", theme: "dark", palette: "dark-default", image: "" },
@@ -190,6 +196,7 @@ function createLinkRow(board, link) {
   row.dataset.linkId = link.id;
   row.dataset.boardId = board.id;
   row.draggable = appState.settings.organizeMode;
+  row.classList.toggle("selected", selectedOrganizeLinks.has(`${board.id}:${link.id}`));
 
   const anchor = document.createElement("a");
   anchor.href = link.url;
@@ -224,8 +231,19 @@ function renderToolState() {
   document.body.classList.toggle("group-tools", appState.settings.groupRightTools);
   document.querySelector("#moreToolsTool").hidden = !appState.settings.groupRightTools;
   document.querySelector("#privacyTool").classList.toggle("active", appState.settings.privacyMode);
-  document.querySelector("#organizeTool").classList.toggle("active", appState.settings.organizeMode);
+  const organizeTool = document.querySelector("#organizeTool");
+  organizeTool.classList.toggle("active", appState.settings.organizeMode);
+  organizeTool.innerHTML = appState.settings.organizeMode ? ORGANIZE_DONE_ICON : ORGANIZE_TOOL_ICON;
   document.querySelector("#incognitoTool").classList.toggle("active", appState.settings.incognitoMode);
+  renderOrganizeToolbar();
+}
+
+function renderOrganizeToolbar() {
+  const toolbar = document.querySelector("#organizeToolbar");
+  const count = selectedOrganizeLinks.size;
+  toolbar.hidden = !appState.settings.organizeMode;
+  document.querySelector("#organizeSelectionCount").textContent = `${count} selected`;
+  document.querySelector("#organizeDelete").disabled = count === 0;
 }
 
 function renderOnboarding() {
@@ -585,6 +603,16 @@ nodes.boardGrid.addEventListener("click", async (event) => {
   const editLinkButton = event.target.closest("[data-edit-link]");
   const deleteLinkButton = event.target.closest("[data-delete-link]");
 
+  if (appState.settings.organizeMode && linkAnchor) {
+    event.preventDefault();
+    const key = `${linkAnchor.dataset.boardId}:${linkAnchor.dataset.openLink}`;
+    if (selectedOrganizeLinks.has(key)) selectedOrganizeLinks.delete(key);
+    else selectedOrganizeLinks.add(key);
+    linkAnchor.closest(".bookmark-row")?.classList.toggle("selected", selectedOrganizeLinks.has(key));
+    renderOrganizeToolbar();
+    return;
+  }
+
   if (addBoardButton) openInlineBoardEditor(addBoardButton);
   if (addLinkButton) openInlineLinkEditor(addLinkButton.dataset.addLink);
   if (menuButton) {
@@ -655,9 +683,53 @@ document.querySelector("#incognitoTool").addEventListener("click", async () => {
   await refresh(appState.settings.incognitoMode ? "Private opening disabled" : "Private opening enabled");
 });
 
+async function finishOrganizeMode() {
+  organizeSnapshot = null;
+  organizeDropTarget = null;
+  selectedOrganizeLinks.clear();
+  await setSetting("organizeMode", false);
+  await refresh("Organization saved");
+}
+
+async function cancelOrganizeMode() {
+  if (organizeSnapshot) {
+    organizeSnapshot.settings.organizeMode = false;
+    await saveTaboraState(organizeSnapshot);
+  } else {
+    await setSetting("organizeMode", false);
+  }
+  organizeSnapshot = null;
+  organizeDropTarget = null;
+  selectedOrganizeLinks.clear();
+  appState = await getTaboraState();
+  render();
+  showToast("Organization cancelled");
+}
+
 document.querySelector("#organizeTool").addEventListener("click", async () => {
-  await setSetting("organizeMode", !appState.settings.organizeMode);
-  await refresh(appState.settings.organizeMode ? "Organize mode closed" : "Drag boards and links to rearrange them");
+  if (appState.settings.organizeMode) {
+    await finishOrganizeMode();
+    return;
+  }
+  organizeSnapshot = structuredClone(appState);
+  selectedOrganizeLinks.clear();
+  await setSetting("organizeMode", true);
+  await refresh();
+});
+
+document.querySelector("#organizeDone").addEventListener("click", finishOrganizeMode);
+document.querySelector("#organizeCancel").addEventListener("click", cancelOrganizeMode);
+document.querySelector("#organizeDelete").addEventListener("click", async () => {
+  if (!selectedOrganizeLinks.size) return;
+  await updateTaboraState((state) => {
+    for (const board of state.boards) {
+      board.links = board.links.filter((link) => !selectedOrganizeLinks.has(`${board.id}:${link.id}`));
+      board.links.forEach((link, index) => { link.order = index; });
+    }
+  });
+  const deletedCount = selectedOrganizeLinks.size;
+  selectedOrganizeLinks.clear();
+  await refresh(`${deletedCount} ${deletedCount === 1 ? "bookmark" : "bookmarks"} deleted`);
 });
 
 document.querySelector("#privacyTool").addEventListener("click", async () => {
@@ -715,21 +787,76 @@ nodes.boardGrid.addEventListener("dragstart", (event) => {
   event.target.classList.add("dragging");
 });
 
-nodes.boardGrid.addEventListener("dragend", (event) => { event.target.classList.remove("dragging"); draggedItem = null; });
-nodes.boardGrid.addEventListener("dragover", (event) => { if (draggedItem) event.preventDefault(); });
+function clearOrganizeDropIndicator() {
+  nodes.boardGrid.querySelector(".organize-drop-indicator")?.remove();
+  organizeDropTarget = null;
+}
+
+function showOrganizeDropIndicator(event) {
+  if (draggedItem?.type !== "board") { clearOrganizeDropIndicator(); return; }
+  const columns = [...nodes.boardGrid.querySelectorAll("[data-board-column]")];
+  const column = event.target.closest("[data-board-column]") || columns.reduce((nearest, item) => {
+    const rect = item.getBoundingClientRect();
+    const distance = Math.abs(event.clientX - (rect.left + rect.width / 2));
+    return !nearest || distance < nearest.distance ? { item, distance } : nearest;
+  }, null)?.item;
+  if (!column) { clearOrganizeDropIndicator(); return; }
+
+  const cards = [...column.querySelectorAll(".board-card:not(.dragging)")];
+  const beforeCard = cards.find((card) => {
+    const rect = card.getBoundingClientRect();
+    return event.clientY < rect.top + rect.height / 2;
+  }) || null;
+  const gridRect = nodes.boardGrid.getBoundingClientRect();
+  const columnRect = column.getBoundingClientRect();
+  const lastCardRect = cards.at(-1)?.getBoundingClientRect();
+  const top = beforeCard
+    ? beforeCard.getBoundingClientRect().top - gridRect.top - 12
+    : lastCardRect
+      ? lastCardRect.bottom - gridRect.top + 12
+      : columnRect.top - gridRect.top + 3;
+  let indicator = nodes.boardGrid.querySelector(".organize-drop-indicator");
+  if (!indicator) {
+    indicator = document.createElement("div");
+    indicator.className = "organize-drop-indicator";
+    nodes.boardGrid.append(indicator);
+  }
+  indicator.style.left = `${columnRect.left - gridRect.left}px`;
+  indicator.style.top = `${top}px`;
+  indicator.style.width = `${columnRect.width}px`;
+  organizeDropTarget = {
+    column: Number(column.dataset.boardColumn),
+    beforeBoardId: beforeCard?.dataset.boardId || null
+  };
+}
+
+nodes.boardGrid.addEventListener("dragend", (event) => {
+  event.target.classList.remove("dragging");
+  draggedItem = null;
+  clearOrganizeDropIndicator();
+});
+nodes.boardGrid.addEventListener("dragover", (event) => {
+  if (!draggedItem) return;
+  event.preventDefault();
+  event.dataTransfer.dropEffect = "move";
+  showOrganizeDropIndicator(event);
+});
 nodes.boardGrid.addEventListener("drop", async (event) => {
   event.preventDefault();
   const targetBoard = event.target.closest(".board-card");
   const targetColumn = event.target.closest("[data-board-column]");
   if (!draggedItem) return;
-  if (draggedItem.type === "board" && targetBoard) await reorderBoard(draggedItem.id, targetBoard.dataset.boardId);
+  if (draggedItem.type === "board" && organizeDropTarget?.beforeBoardId) await reorderBoard(draggedItem.id, organizeDropTarget.beforeBoardId);
+  else if (draggedItem.type === "board" && organizeDropTarget) await moveBoardToColumn(draggedItem.id, organizeDropTarget.column);
+  else if (draggedItem.type === "board" && targetBoard) await reorderBoard(draggedItem.id, targetBoard.dataset.boardId);
   else if (draggedItem.type === "board" && targetColumn) await moveBoardToColumn(draggedItem.id, Number(targetColumn.dataset.boardColumn));
   if (draggedItem.type === "link") {
     if (!targetBoard) return;
     const targetLink = event.target.closest(".bookmark-row");
     await moveLink(draggedItem.id, draggedItem.boardId, targetBoard.dataset.boardId, targetLink?.dataset.linkId || null);
   }
-  await refresh("Order updated");
+  clearOrganizeDropIndicator();
+  await refresh();
 });
 
 let insertionFrame = null;
