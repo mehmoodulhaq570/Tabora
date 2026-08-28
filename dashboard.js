@@ -165,6 +165,7 @@ function createBoardCard(board, query) {
   const links = ordered(board.links).filter((link) => !normalizedQuery || [link.title, link.url, link.note].some((value) => String(value || "").toLowerCase().includes(normalizedQuery)));
 
   if (!links.length) {
+    card.classList.add("empty-board");
     const empty = document.createElement("button");
     empty.className = "empty-board-link";
     empty.dataset.addLink = board.id;
