@@ -4,6 +4,7 @@
   "description": "Organize bookmarks into beautiful pages and boards on every new tab.",
   "version": "2.0.0",
   "permissions": ["tabs", "storage"],
+  "host_permissions": ["http://*/*", "https://*/*"],
   "optional_permissions": ["bookmarks"],
   "chrome_url_overrides": {
     "newtab": "dashboard.html"

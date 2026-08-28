@@ -241,6 +241,131 @@ function openLinkDialog(boardId, link = null) {
   (link ? nodes.linkTitle : nodes.linkUrl).focus();
 }
 
+function closeInlineLinkEditor() {
+  const editor = document.querySelector(".inline-link-editor");
+  editor?.closest(".board-card")?.classList.remove("link-editor-open");
+  editor?.remove();
+}
+
+async function fetchLinkMetadata(url) {
+  const fallback = { title: getDomain(url), note: "", favIconUrl: "" };
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8000);
+
+  try {
+    const response = await fetch(url, { credentials: "omit", redirect: "follow", signal: controller.signal });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const contentType = response.headers.get("content-type") || "";
+    if (!contentType.includes("text/html") && !contentType.includes("application/xhtml+xml")) return fallback;
+
+    const html = (await response.text()).slice(0, 1500000);
+    const documentNode = new DOMParser().parseFromString(html, "text/html");
+    const title = documentNode.querySelector('meta[property="og:title"]')?.content
+      || documentNode.querySelector('meta[name="twitter:title"]')?.content
+      || documentNode.title;
+    const note = documentNode.querySelector('meta[property="og:description"]')?.content
+      || documentNode.querySelector('meta[name="description"]')?.content
+      || "";
+    const iconHref = documentNode.querySelector('link[rel~="icon"]')?.href || "";
+    let favIconUrl = "";
+    if (iconHref) {
+      const iconUrl = new URL(iconHref, response.url || url);
+      if (["http:", "https:"].includes(iconUrl.protocol)) favIconUrl = iconUrl.href;
+    }
+
+    return {
+      title: String(title || fallback.title).replace(/\s+/g, " ").trim(),
+      note: String(note).replace(/\s+/g, " ").trim().slice(0, 2000),
+      favIconUrl
+    };
+  } catch {
+    return fallback;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function showInlineLinkDetails(editor, url, metadata) {
+  if (!editor.isConnected) return;
+  editor.innerHTML = `
+    <form class="inline-link-details-form">
+      <input class="inline-link-field" name="url" aria-label="Link URL" autocomplete="url" required>
+      <textarea class="inline-link-field inline-link-title" name="title" aria-label="Link title" maxlength="240" required></textarea>
+      <textarea class="inline-link-field inline-link-note" name="note" aria-label="Optional description" maxlength="2000" placeholder="Optional description (shown below title)"></textarea>
+      <span class="inline-link-count" aria-live="polite">0</span>
+      <div class="inline-link-actions">
+        <button class="accent-button" type="submit">Add Link</button>
+        <button class="secondary-button inline-link-cancel" type="button">Cancel</button>
+      </div>
+    </form>`;
+
+  const form = editor.querySelector("form");
+  const urlInput = form.elements.url;
+  const titleInput = form.elements.title;
+  const noteInput = form.elements.note;
+  const count = editor.querySelector(".inline-link-count");
+  urlInput.value = url;
+  titleInput.value = metadata.title || getDomain(url);
+  noteInput.value = metadata.note || "";
+  count.textContent = String(2000 - noteInput.value.length);
+  noteInput.addEventListener("input", () => { count.textContent = String(2000 - noteInput.value.length); });
+  editor.querySelector(".inline-link-cancel").addEventListener("click", closeInlineLinkEditor);
+  form.addEventListener("keydown", (event) => { if (event.key === "Escape") closeInlineLinkEditor(); });
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const normalizedUrl = normalizeUrl(urlInput.value);
+    if (!normalizedUrl) { showToast("Enter a valid web address"); urlInput.focus(); return; }
+    const submitButton = form.querySelector('[type="submit"]');
+    submitButton.disabled = true;
+    await addLink(editor.dataset.boardId, {
+      url: normalizedUrl,
+      title: titleInput.value,
+      note: noteInput.value,
+      favIconUrl: metadata.favIconUrl
+    });
+    await refresh("Link added");
+  });
+  titleInput.focus();
+  titleInput.select();
+}
+
+function openInlineLinkEditor(boardId) {
+  closeInlineLinkEditor();
+  const card = nodes.boardGrid.querySelector(`.board-card[data-board-id="${CSS.escape(boardId)}"]`);
+  if (!card) return;
+
+  const editor = document.createElement("section");
+  editor.className = "inline-link-editor";
+  editor.dataset.boardId = boardId;
+  editor.innerHTML = `
+    <form class="inline-link-url-form">
+      <input class="inline-link-field" name="url" aria-label="Link URL" placeholder="https://example.com" autocomplete="url" required>
+      <div class="inline-link-actions">
+        <button class="accent-button" type="submit">Add Link</button>
+        <button class="secondary-button inline-link-cancel" type="button">Cancel</button>
+      </div>
+    </form>`;
+  card.classList.add("link-editor-open");
+  card.querySelector(".board-header").after(editor);
+
+  const form = editor.querySelector("form");
+  const input = form.elements.url;
+  editor.querySelector(".inline-link-cancel").addEventListener("click", closeInlineLinkEditor);
+  form.addEventListener("keydown", (event) => { if (event.key === "Escape") closeInlineLinkEditor(); });
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const url = normalizeUrl(input.value);
+    if (!url) { showToast("Enter a valid web address"); input.focus(); return; }
+    editor.innerHTML = '<div class="inline-link-fetching" role="status"><span class="fetch-spinner" aria-hidden="true"></span><strong>Fetching title...</strong></div>';
+    const [metadata] = await Promise.all([
+      fetchLinkMetadata(url),
+      new Promise((resolve) => setTimeout(resolve, 420))
+    ]);
+    showInlineLinkDetails(editor, url, metadata);
+  });
+  input.focus();
+}
+
 function closeDialog(id) {
   document.querySelector(`#${id}`)?.close();
 }
@@ -272,7 +397,7 @@ function showContextMenu(anchor, items) {
 function boardMenuItems(board) {
   const items = [
     { icon: "&#8599;", label: "Open all links", action: () => openBoard(board) },
-    { icon: "+", label: "Add link", action: () => openLinkDialog(board.id) },
+    { icon: "+", label: "Add link", action: () => openInlineLinkEditor(board.id) },
     { icon: "&#9998;", label: "Rename board", action: () => openBoardDialog(board) },
     { icon: "&#128203;", label: "Share / copy links", action: () => copyBoardLinks(board) }
   ];
@@ -418,7 +543,7 @@ nodes.boardGrid.addEventListener("click", async (event) => {
   const deleteLinkButton = event.target.closest("[data-delete-link]");
 
   if (addBoardButton) openInlineBoardEditor(addBoardButton);
-  if (addLinkButton) openLinkDialog(addLinkButton.dataset.addLink);
+  if (addLinkButton) openInlineLinkEditor(addLinkButton.dataset.addLink);
   if (menuButton) {
     const board = appState.boards.find((item) => item.id === menuButton.dataset.boardMenu);
     if (board) showContextMenu(menuButton, boardMenuItems(board));

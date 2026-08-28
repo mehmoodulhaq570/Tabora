@@ -301,7 +301,7 @@ async function addLink(boardId, values) {
       title: cleanName(values.title, getDomain(url)),
       url,
       favIconUrl: values.favIconUrl || "",
-      note: String(values.note || "").trim().slice(0, 180),
+      note: String(values.note || "").trim().slice(0, 2000),
       order: board.links.length
     };
     board.links.push(link);
@@ -317,7 +317,7 @@ async function updateLink(boardId, linkId, values) {
     const url = normalizeUrl(values.url);
     if (url) link.url = url;
     link.title = cleanName(values.title, link.title);
-    link.note = String(values.note || "").trim().slice(0, 180);
+    link.note = String(values.note || "").trim().slice(0, 2000);
   });
 }
 

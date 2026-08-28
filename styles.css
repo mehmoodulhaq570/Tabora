@@ -23,6 +23,10 @@
 
 * { box-sizing: border-box; }
 html { min-width: 320px; min-height: 100%; }
+html { scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--text) 42%, transparent) transparent; }
+html::-webkit-scrollbar { width: 8px; }
+html::-webkit-scrollbar-track { background: transparent; }
+html::-webkit-scrollbar-thumb { border-radius: 8px; background: color-mix(in srgb, var(--text) 38%, transparent); }
 body { margin: 0; min-height: 100vh; background: var(--page-bg); color: var(--text); }
 button, input, textarea, select { font: inherit; letter-spacing: 0; }
 button { cursor: pointer; }
@@ -360,6 +364,21 @@ textarea.dark-input { min-height: 92px; padding-top: 10px; resize: vertical; }
 .link-actions { display: none; align-items: center; padding-right: 4px; }
 .bookmark-row:hover .link-actions, .organize-mode .link-actions { display: flex; }
 .link-actions button:last-child:hover { color: var(--danger); }
+
+.link-editor-open .board-links, .link-editor-open .board-footer { display: none; }
+.inline-link-editor { margin: 12px 16px 16px; padding: 14px; border: 1px solid var(--line); border-radius: 8px; background: color-mix(in srgb, var(--surface-solid) 82%, transparent); }
+.inline-link-url-form, .inline-link-details-form { display: grid; gap: 10px; }
+.inline-link-field { width: 100%; min-width: 0; min-height: 44px; padding: 10px 13px; border: 1px solid color-mix(in srgb, var(--green) 48%, var(--line)); border-radius: 8px; background: color-mix(in srgb, var(--page-bg) 86%, black 14%); color: var(--text); outline: 0; resize: vertical; }
+.inline-link-field:focus-visible { border-color: var(--green); outline: 2px solid color-mix(in srgb, var(--green) 22%, transparent); outline-offset: 1px; }
+.inline-link-title { min-height: 68px; }
+.inline-link-note { min-height: 78px; }
+.inline-link-count { margin-top: -7px; color: var(--muted); font-size: 11px; font-weight: 800; text-align: right; }
+.inline-link-actions { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 9px; }
+.inline-link-actions button { min-height: 44px; }
+.inline-link-cancel { border-color: color-mix(in srgb, var(--danger) 52%, var(--line)); color: var(--danger); }
+.inline-link-fetching { display: flex; min-height: 72px; align-items: center; gap: 13px; padding: 0 12px; color: var(--text); }
+.fetch-spinner { width: 24px; height: 24px; flex: 0 0 24px; border: 3px solid color-mix(in srgb, var(--muted) 55%, transparent); border-top-color: var(--green); border-radius: 50%; animation: spin-fetch 750ms linear infinite; }
+@keyframes spin-fetch { to { transform: rotate(360deg); } }
 
 .empty-board-link { min-height: 50px; visibility: hidden; border: 0; background: transparent; }
 .empty-board-link:hover { border-color: var(--green); color: var(--green); }
