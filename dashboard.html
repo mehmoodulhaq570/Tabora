@@ -94,11 +94,14 @@
       </form>
     </dialog>
 
-    <dialog id="trashDialog" class="app-dialog wide-dialog">
-      <div class="dialog-content">
-        <header class="dialog-header"><div><span class="eyebrow">Recoverable items</span><h2>Trash</h2></div><button class="dialog-close" type="button" data-close-dialog="trashDialog" aria-label="Close">&times;</button></header>
+    <dialog id="trashDialog" class="app-dialog trash-dialog">
+      <div class="trash-dialog-content">
+        <header class="trash-dialog-header">
+          <h2><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 14h10l1-14M10 11v6M14 11v6"></path></svg>Trash</h2>
+          <span>Items are permanently deleted after 30 days</span>
+        </header>
         <div id="trashList" class="trash-list"></div>
-        <footer class="dialog-footer"><button id="emptyTrash" class="danger-button" type="button">Empty trash</button></footer>
+        <footer class="trash-dialog-footer"><button id="emptyTrash" class="trash-empty-button" type="button">Empty Trash</button><button class="trash-close-button" type="button" data-close-dialog="trashDialog">Close</button></footer>
       </div>
     </dialog>
 

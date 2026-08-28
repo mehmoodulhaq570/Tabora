@@ -197,7 +197,7 @@ async function deletePage(pageId) {
     if (!page || page.protected) return false;
     const removedBoards = state.boards.filter((board) => board.pageId === pageId);
     for (const board of removedBoards) {
-      state.trash.unshift({ type: "board", value: board, deletedAt: Date.now() });
+      state.trash.unshift({ type: "board", value: board, pageName: page.name, deletedAt: Date.now() });
     }
     state.boards = state.boards.filter((board) => board.pageId !== pageId);
     state.pages = state.pages.filter((item) => item.id !== pageId);
@@ -265,7 +265,8 @@ async function deleteBoard(boardId) {
   return updateTaboraState((state) => {
     const board = state.boards.find((item) => item.id === boardId);
     if (!board) return;
-    state.trash.unshift({ type: "board", value: structuredClone(board), deletedAt: Date.now() });
+    const page = state.pages.find((item) => item.id === board.pageId);
+    state.trash.unshift({ type: "board", value: structuredClone(board), pageName: page?.name || "Home", deletedAt: Date.now() });
     state.boards = state.boards.filter((item) => item.id !== boardId);
   });
 }
@@ -273,7 +274,31 @@ async function deleteBoard(boardId) {
 async function restoreTrashItem(index) {
   return updateTaboraState((state) => {
     const [item] = state.trash.splice(index, 1);
-    if (!item || item.type !== "board") return;
+    if (!item) return;
+    if (item.type === "link") {
+      let board = state.boards.find((entry) => entry.id === item.boardId);
+      if (!board) {
+        const pageId = state.pages.some((page) => page.id === item.pageId) ? item.pageId : "home";
+        const pageBoards = state.boards.filter((entry) => entry.pageId === pageId);
+        board = {
+          id: makeId("board"),
+          pageId,
+          name: cleanName(item.boardName, "Restored bookmarks"),
+          order: pageBoards.length,
+          column: pageBoards.length % TABORA_BOARD_COLUMNS,
+          columnOrder: pageBoards.filter((entry) => entry.column === pageBoards.length % TABORA_BOARD_COLUMNS).length,
+          starred: false,
+          createdAt: Date.now(),
+          links: []
+        };
+        state.boards.push(board);
+      }
+      const link = structuredClone(item.value);
+      link.order = board.links.length;
+      board.links.push(link);
+      return;
+    }
+    if (item.type !== "board") return;
     const board = item.value;
     if (!state.pages.some((page) => page.id === board.pageId)) board.pageId = "home";
     board.order = state.boards.filter((entry) => entry.pageId === board.pageId).length;
@@ -287,6 +312,12 @@ async function restoreTrashItem(index) {
 async function emptyTrash() {
   return updateTaboraState((state) => {
     state.trash = [];
+  });
+}
+
+async function deleteTrashItem(index) {
+  return updateTaboraState((state) => {
+    state.trash.splice(index, 1);
   });
 }
 
@@ -324,7 +355,20 @@ async function updateLink(boardId, linkId, values) {
 async function deleteLink(boardId, linkId) {
   return updateTaboraState((state) => {
     const board = state.boards.find((item) => item.id === boardId);
-    if (board) board.links = board.links.filter((item) => item.id !== linkId);
+    const link = board?.links.find((item) => item.id === linkId);
+    if (!board || !link) return;
+    const page = state.pages.find((item) => item.id === board.pageId);
+    state.trash.unshift({
+      type: "link",
+      value: structuredClone(link),
+      boardId: board.id,
+      boardName: board.name,
+      pageId: board.pageId,
+      pageName: page?.name || "Home",
+      deletedAt: Date.now()
+    });
+    board.links = board.links.filter((item) => item.id !== linkId);
+    board.links.forEach((item, index) => { item.order = index; });
   });
 }
 

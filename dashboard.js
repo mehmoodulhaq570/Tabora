@@ -723,6 +723,19 @@ document.querySelector("#organizeDelete").addEventListener("click", async () => 
   if (!selectedOrganizeLinks.size) return;
   await updateTaboraState((state) => {
     for (const board of state.boards) {
+      const page = state.pages.find((item) => item.id === board.pageId);
+      for (const link of board.links) {
+        if (!selectedOrganizeLinks.has(`${board.id}:${link.id}`)) continue;
+        state.trash.unshift({
+          type: "link",
+          value: structuredClone(link),
+          boardId: board.id,
+          boardName: board.name,
+          pageId: board.pageId,
+          pageName: page?.name || "Home",
+          deletedAt: Date.now()
+        });
+      }
       board.links = board.links.filter((link) => !selectedOrganizeLinks.has(`${board.id}:${link.id}`));
       board.links.forEach((link, index) => { link.order = index; });
     }
@@ -775,7 +788,15 @@ document.querySelector("#importTool").addEventListener("click", () => {
   pendingImportGroups = [];
   nodes.importDialog.showModal();
 });
-document.querySelector("#trashTool").addEventListener("click", () => { renderTrash(); nodes.trashDialog.showModal(); });
+document.querySelector("#trashTool").addEventListener("click", async () => {
+  const cutoff = Date.now() - (30 * 24 * 60 * 60 * 1000);
+  if (appState.trash.some((item) => item.deletedAt && item.deletedAt < cutoff)) {
+    await updateTaboraState((state) => { state.trash = state.trash.filter((item) => !item.deletedAt || item.deletedAt >= cutoff); });
+    await refresh();
+  }
+  renderTrash();
+  nodes.trashDialog.showModal();
+});
 
 nodes.boardGrid.addEventListener("dragstart", (event) => {
   if (!appState.settings.organizeMode) return;
@@ -1028,23 +1049,58 @@ document.querySelector("#commitImport").addEventListener("click", async () => {
 });
 
 function renderTrash() {
-  nodes.trashList.innerHTML = "";
-  if (!appState.trash.length) nodes.trashList.innerHTML = '<div class="dialog-empty">Trash is empty.</div>';
-  for (const [index, item] of appState.trash.entries()) {
-    const row = document.createElement("div");
-    row.className = "trash-row";
-    row.innerHTML = `<div><strong></strong><span>${item.value.links?.length || 0} links</span></div><button class="secondary-button" data-restore-index="${index}">Restore</button>`;
-    setText(row, "strong", item.value.name);
-    nodes.trashList.append(row);
+  nodes.trashList.replaceChildren();
+  if (!appState.trash.length) {
+    nodes.trashList.innerHTML = '<div class="dialog-empty">Trash is empty.</div>';
+    return;
+  }
+
+  const groups = [
+    { type: "link", label: "Bookmarks" },
+    { type: "board", label: "Boards" }
+  ];
+  for (const groupDefinition of groups) {
+    const items = appState.trash.map((item, index) => ({ item, index })).filter(({ item }) => item.type === groupDefinition.type);
+    if (!items.length) continue;
+    const group = document.createElement("section");
+    group.className = "trash-group";
+    const heading = document.createElement("h3");
+    heading.textContent = groupDefinition.label;
+    group.append(heading);
+    for (const { item, index } of items) {
+      const deletedAt = item.deletedAt || Date.now();
+      const age = Date.now() - deletedAt;
+      const remaining = Math.max(0, 30 - Math.floor(age / (24 * 60 * 60 * 1000)));
+      const row = document.createElement("div");
+      row.className = "trash-row";
+      row.innerHTML = `
+        <div class="trash-copy"><strong></strong><span class="trash-date"></span><span class="trash-location"></span></div>
+        <div class="trash-row-actions"><button class="trash-restore-button" type="button" data-restore-index="${index}">Restore</button><button class="trash-delete-button" type="button" data-delete-trash-index="${index}">Delete</button></div>`;
+      row.querySelector("strong").textContent = item.type === "link" ? item.value.title : item.value.name;
+      row.querySelector(".trash-date").textContent = `Deleted ${new Date(deletedAt).toLocaleDateString()} · ${remaining} days remaining`;
+      row.querySelector(".trash-location").textContent = item.type === "link"
+        ? `Board: ${item.boardName || "Unknown"} · Page: ${item.pageName || "Home"}`
+        : `${item.value.links?.length || 0} bookmarks · Page: ${item.pageName || "Home"}`;
+      group.append(row);
+    }
+    nodes.trashList.append(group);
   }
 }
 
 nodes.trashList.addEventListener("click", async (event) => {
-  const button = event.target.closest("[data-restore-index]");
-  if (!button) return;
-  await restoreTrashItem(Number(button.dataset.restoreIndex));
-  await refresh("Board restored");
-  renderTrash();
+  const restoreButton = event.target.closest("[data-restore-index]");
+  const deleteButton = event.target.closest("[data-delete-trash-index]");
+  if (restoreButton) {
+    const item = appState.trash[Number(restoreButton.dataset.restoreIndex)];
+    await restoreTrashItem(Number(restoreButton.dataset.restoreIndex));
+    await refresh(item?.type === "link" ? "Bookmark restored" : "Board restored");
+    renderTrash();
+  }
+  if (deleteButton && window.confirm("Permanently delete this item?")) {
+    await deleteTrashItem(Number(deleteButton.dataset.deleteTrashIndex));
+    await refresh("Item permanently deleted");
+    renderTrash();
+  }
 });
 
 document.querySelector("#emptyTrash").addEventListener("click", async () => {
