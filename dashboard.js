@@ -48,6 +48,8 @@ let deleteConfirmationResolve = null;
 
 const ORGANIZE_TOOL_ICON = '<svg class="rail-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="6" height="6" rx="1"></rect><rect x="14" y="3" width="6" height="6" rx="1"></rect><rect x="3" y="14" width="6" height="6" rx="1"></rect><path d="m13.5 17 2.2 2.2 4.8-5"></path></svg>';
 const ORGANIZE_DONE_ICON = '<svg class="rail-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4.5 4.5L19 7"></path></svg>';
+const PRIVACY_VISIBLE_ICON = '<svg class="rail-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"></path><circle cx="12" cy="12" r="2.7"></circle></svg>';
+const PRIVACY_HIDDEN_ICON = '<svg class="rail-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3l18 18"></path><path d="M10.6 6.2A10.8 10.8 0 0 1 12 6c6 0 9.5 6 9.5 6a16 16 0 0 1-2.1 2.8M6.3 6.3C3.9 8 2.5 12 2.5 12s3.5 6 9.5 6c1.5 0 2.8-.4 4-1"></path><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"></path></svg>';
 
 const WALLPAPERS = [
   { id: "none", name: "Default", theme: "dark", palette: "dark-default", image: "" },
@@ -232,7 +234,11 @@ function renderToolState() {
   document.body.classList.toggle("hide-bookmark-descriptions", !appState.settings.showBookmarkDescriptions);
   document.body.classList.toggle("group-tools", appState.settings.groupRightTools);
   document.querySelector("#moreToolsTool").hidden = !appState.settings.groupRightTools;
-  document.querySelector("#privacyTool").classList.toggle("active", appState.settings.privacyMode);
+  const privacyTool = document.querySelector("#privacyTool");
+  privacyTool.classList.toggle("active", appState.settings.privacyMode);
+  privacyTool.innerHTML = appState.settings.privacyMode ? PRIVACY_HIDDEN_ICON : PRIVACY_VISIBLE_ICON;
+  privacyTool.title = appState.settings.privacyMode ? "Privacy Blur ON - Click to disable" : "Privacy Blur OFF - Click to enable";
+  privacyTool.setAttribute("aria-label", privacyTool.title);
   const organizeTool = document.querySelector("#organizeTool");
   organizeTool.classList.toggle("active", appState.settings.organizeMode);
   organizeTool.innerHTML = appState.settings.organizeMode ? ORGANIZE_DONE_ICON : ORGANIZE_TOOL_ICON;
@@ -274,7 +280,7 @@ function showToast(message, tone = "") {
   }, 3600);
 }
 
-function requestDeleteConfirmation({ title, prompt, warning = "", caution = "This action cannot be undone.", compact = false }) {
+function requestDeleteConfirmation({ title, prompt, warning = "", caution = "This action cannot be undone.", compact = false, submitLabel = "Delete" }) {
   if (deleteConfirmationResolve) settleDeleteConfirmation(false);
   nodes.deleteConfirmDialog.classList.toggle("compact", compact);
   document.querySelector("#deleteConfirmTitle").textContent = title;
@@ -285,6 +291,7 @@ function requestDeleteConfirmation({ title, prompt, warning = "", caution = "Thi
   const cautionNode = document.querySelector("#deleteConfirmCaution");
   cautionNode.textContent = caution;
   cautionNode.hidden = !caution;
+  document.querySelector("#deleteConfirmSubmit").textContent = submitLabel;
   nodes.deleteConfirmDialog.showModal();
   return new Promise((resolve) => { deleteConfirmationResolve = resolve; });
 }
@@ -810,7 +817,7 @@ document.querySelector("#organizeDelete").addEventListener("click", async () => 
 
 document.querySelector("#privacyTool").addEventListener("click", async () => {
   await setSetting("privacyMode", !appState.settings.privacyMode);
-  await refresh(appState.settings.privacyMode ? "Privacy mode disabled" : "URLs are now blurred");
+  await refresh(appState.settings.privacyMode ? "Privacy blur disabled" : "Boards are now blurred");
 });
 
 let appearanceCloseTimer;
@@ -1192,7 +1199,16 @@ nodes.trashList.addEventListener("click", async (event) => {
 });
 
 document.querySelector("#emptyTrash").addEventListener("click", async () => {
-  if (!appState.trash.length || !window.confirm("Permanently delete everything in Trash?")) return;
+  if (!appState.trash.length) return;
+  const confirmed = await requestDeleteConfirmation({
+    title: "Empty Trash",
+    prompt: "Permanently delete all items in trash? You cannot undo this action.",
+    warning: "",
+    caution: "",
+    compact: true,
+    submitLabel: "Empty Trash"
+  });
+  if (!confirmed) return;
   await emptyTrash();
   await refresh("Trash emptied");
   renderTrash();
