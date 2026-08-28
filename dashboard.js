@@ -497,14 +497,31 @@ document.querySelector("#privacyTool").addEventListener("click", async () => {
   await refresh(appState.settings.privacyMode ? "Privacy mode disabled" : "URLs are now blurred");
 });
 
+let appearanceCloseTimer;
+
+function openAppearancePanel() {
+  clearTimeout(appearanceCloseTimer);
+  renderAppearancePanel();
+  nodes.appearancePanel.hidden = false;
+  requestAnimationFrame(() => requestAnimationFrame(() => nodes.appearancePanel.classList.add("is-open")));
+}
+
+function closeAppearancePanel() {
+  clearTimeout(appearanceCloseTimer);
+  nodes.appearancePanel.classList.remove("is-open");
+  appearanceCloseTimer = setTimeout(() => {
+    if (!nodes.appearancePanel.classList.contains("is-open")) nodes.appearancePanel.hidden = true;
+  }, 280);
+}
+
 function toggleAppearancePanel() {
-  nodes.appearancePanel.hidden = !nodes.appearancePanel.hidden;
-  if (!nodes.appearancePanel.hidden) renderAppearancePanel();
+  if (nodes.appearancePanel.hidden || !nodes.appearancePanel.classList.contains("is-open")) openAppearancePanel();
+  else closeAppearancePanel();
 }
 
 document.querySelector("#wallpaperTool").addEventListener("click", toggleAppearancePanel);
 document.querySelector("#settingsTool").addEventListener("click", () => {
-  nodes.appearancePanel.hidden = true;
+  closeAppearancePanel();
   renderSettings();
   nodes.settingsDialog.showModal();
 });
