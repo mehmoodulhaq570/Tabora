@@ -36,6 +36,7 @@ const nodes = {
 let appState = createDefaultState();
 let draggedItem = null;
 let customWallpaperUrl = "";
+let wallpaperPreviewUrls = [];
 let toastTimer = null;
 let pendingImportGroups = [];
 let boardInsertionPlacement = { column: 0, order: 0 };
@@ -666,9 +667,9 @@ document.querySelector("#privacyTool").addEventListener("click", async () => {
 
 let appearanceCloseTimer;
 
-function openAppearancePanel() {
+async function openAppearancePanel() {
   clearTimeout(appearanceCloseTimer);
-  renderAppearancePanel();
+  await renderAppearancePanel();
   nodes.appearancePanel.hidden = false;
   requestAnimationFrame(() => requestAnimationFrame(() => nodes.appearancePanel.classList.add("is-open")));
 }
@@ -926,8 +927,36 @@ document.querySelector("#emptyTrash").addEventListener("click", async () => {
   renderTrash();
 });
 
-function renderAppearancePanel() {
+async function renderAppearancePanel() {
   document.querySelectorAll("[data-theme]").forEach((button) => button.classList.toggle("active", button.dataset.theme === appState.settings.theme));
+  wallpaperPreviewUrls.forEach((url) => URL.revokeObjectURL(url));
+  wallpaperPreviewUrls = [];
+
+  const customWallpapers = await getCustomWallpapers();
+  const customSection = document.querySelector("#yourWallpapersSection");
+  const customGrid = document.querySelector("#yourWallpaperGrid");
+  customSection.hidden = customWallpapers.length === 0;
+  document.querySelector("#yourWallpaperCount").textContent = String(customWallpapers.length);
+  customGrid.innerHTML = "";
+  for (const wallpaper of customWallpapers) {
+    const url = URL.createObjectURL(wallpaper.blob);
+    wallpaperPreviewUrls.push(url);
+    const card = document.createElement("article");
+    card.className = "custom-wallpaper-card";
+    card.classList.toggle("selected", wallpaper.id === appState.settings.wallpaper);
+    card.innerHTML = `
+      <button class="custom-wallpaper-preview" type="button" data-wallpaper="${wallpaper.id}" aria-label="Use uploaded wallpaper"></button>
+      <strong class="custom-wallpaper-name"></strong>
+      <div class="custom-wallpaper-actions">
+        <button class="custom-wallpaper-action" type="button" data-rename-wallpaper="${wallpaper.id}" title="Rename wallpaper" aria-label="Rename wallpaper"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4Z"></path><path d="m13.5 6.5 4 4"></path></svg></button>
+        <button class="custom-wallpaper-action" type="button" data-download-wallpaper="${wallpaper.id}" title="Download wallpaper" aria-label="Download wallpaper"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-4-4 4 4 4-4M5 18v3h14v-3"></path></svg></button>
+        <button class="custom-wallpaper-action danger" type="button" data-delete-wallpaper="${wallpaper.id}" title="Delete wallpaper" aria-label="Delete wallpaper"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 14h10l1-14M10 11v6M14 11v6"></path></svg></button>
+      </div>`;
+    card.querySelector(".custom-wallpaper-preview").style.backgroundImage = `url("${url}")`;
+    card.querySelector(".custom-wallpaper-name").textContent = wallpaper.name;
+    customGrid.append(card);
+  }
+
   const wallpapers = WALLPAPERS.filter((wallpaper) => wallpaper.theme === appState.settings.theme);
   document.querySelector("#wallpaperCount").textContent = String(wallpapers.length);
   const grid = document.querySelector("#wallpaperGrid");
@@ -1017,7 +1046,7 @@ document.querySelector(".segmented-control").addEventListener("click", async (ev
   const nextTheme = button.dataset.theme;
   const currentIsAvailable = WALLPAPERS.some((wallpaper) => wallpaper.id === appState.settings.wallpaper && wallpaper.theme === nextTheme);
   await setSetting("theme", button.dataset.theme);
-  if (!currentIsAvailable && appState.settings.wallpaper !== "custom") await setSetting("wallpaper", "none");
+  if (!currentIsAvailable && !appState.settings.wallpaper.startsWith("custom")) await setSetting("wallpaper", "none");
   await refresh();
   await applyAppearance();
   renderAppearancePanel();
@@ -1032,15 +1061,50 @@ document.querySelector("#wallpaperGrid").addEventListener("click", async (event)
   renderAppearancePanel();
 });
 
+document.querySelector("#yourWallpaperGrid").addEventListener("click", async (event) => {
+  const deleteButton = event.target.closest("[data-delete-wallpaper]");
+  const downloadButton = event.target.closest("[data-download-wallpaper]");
+  const renameButton = event.target.closest("[data-rename-wallpaper]");
+  const selectButton = event.target.closest("[data-wallpaper]");
+  if (deleteButton) {
+    const id = deleteButton.dataset.deleteWallpaper;
+    await deleteCustomWallpaper(id);
+    if (appState.settings.wallpaper === id) await setSetting("wallpaper", "none");
+    await refresh("Wallpaper removed");
+    await applyAppearance();
+    await renderAppearancePanel();
+    return;
+  }
+  if (downloadButton) {
+    const wallpaper = (await getCustomWallpapers()).find((item) => item.id === downloadButton.dataset.downloadWallpaper);
+    if (wallpaper) downloadWallpaper(wallpaper);
+    return;
+  }
+  if (renameButton) {
+    const wallpaper = (await getCustomWallpapers()).find((item) => item.id === renameButton.dataset.renameWallpaper);
+    const name = wallpaper && window.prompt("Wallpaper name", wallpaper.name);
+    if (name?.trim()) {
+      await renameCustomWallpaper(wallpaper.id, name.trim());
+      await renderAppearancePanel();
+    }
+    return;
+  }
+  if (!selectButton) return;
+  await setSetting("wallpaper", selectButton.dataset.wallpaper);
+  await refresh();
+  await applyAppearance();
+  await renderAppearancePanel();
+});
+
 document.querySelector("#wallpaperUpload").addEventListener("change", async (event) => {
   const file = event.target.files[0];
   if (!file) return;
   if (file.size > 12 * 1024 * 1024) { showToast("Choose an image smaller than 12 MB"); return; }
-  await saveWallpaperBlob(file);
-  await setSetting("customWallpaperTheme", appState.settings.theme);
-  await setSetting("wallpaper", "custom");
+  const wallpaperId = await saveWallpaperBlob(file);
+  await setSetting("wallpaper", wallpaperId);
   await refresh("Custom wallpaper applied");
   await applyAppearance();
+  await renderAppearancePanel();
   event.target.value = "";
 });
 
@@ -1057,44 +1121,107 @@ function openWallpaperDatabase() {
 
 async function saveWallpaperBlob(blob) {
   const database = await openWallpaperDatabase();
+  const id = `custom-${Date.now()}-${Math.random().toString(16).slice(2)}`;
   await new Promise((resolve, reject) => {
     const transaction = database.transaction("wallpapers", "readwrite");
-    transaction.objectStore("wallpapers").put(blob, "custom");
+    transaction.objectStore("wallpapers").put({ blob, name: blob.name || "Uploaded wallpaper", createdAt: Date.now() }, id);
+    transaction.oncomplete = resolve;
+    transaction.onerror = () => reject(transaction.error);
+  });
+  database.close();
+  return id;
+}
+
+async function getWallpaperBlob(id = "custom") {
+  const database = await openWallpaperDatabase();
+  const value = await new Promise((resolve, reject) => {
+    const request = database.transaction("wallpapers").objectStore("wallpapers").get(id);
+    request.onsuccess = () => resolve(request.result || null);
+    request.onerror = () => reject(request.error);
+  });
+  database.close();
+  return value instanceof Blob ? value : value?.blob || null;
+}
+
+async function getCustomWallpapers() {
+  const database = await openWallpaperDatabase();
+  const wallpapers = await new Promise((resolve, reject) => {
+    const store = database.transaction("wallpapers").objectStore("wallpapers");
+    const request = store.openCursor();
+    const result = [];
+    request.onsuccess = () => {
+      const cursor = request.result;
+      if (!cursor) { resolve(result); return; }
+      const value = cursor.value;
+      const blob = value instanceof Blob ? value : value?.blob;
+      if (blob) result.push({ id: String(cursor.key), blob, name: value?.name || blob.name || "Uploaded wallpaper", createdAt: value?.createdAt || 0 });
+      cursor.continue();
+    };
+    request.onerror = () => reject(request.error);
+  });
+  database.close();
+  return wallpapers.sort((a, b) => b.createdAt - a.createdAt);
+}
+
+async function deleteCustomWallpaper(id) {
+  const database = await openWallpaperDatabase();
+  await new Promise((resolve, reject) => {
+    const transaction = database.transaction("wallpapers", "readwrite");
+    transaction.objectStore("wallpapers").delete(id);
     transaction.oncomplete = resolve;
     transaction.onerror = () => reject(transaction.error);
   });
   database.close();
 }
 
-async function getWallpaperBlob() {
+async function renameCustomWallpaper(id, name) {
   const database = await openWallpaperDatabase();
-  const blob = await new Promise((resolve, reject) => {
-    const request = database.transaction("wallpapers").objectStore("wallpapers").get("custom");
-    request.onsuccess = () => resolve(request.result || null);
-    request.onerror = () => reject(request.error);
+  await new Promise((resolve, reject) => {
+    const transaction = database.transaction("wallpapers", "readwrite");
+    const store = transaction.objectStore("wallpapers");
+    const request = store.get(id);
+    request.onsuccess = () => {
+      const value = request.result;
+      const blob = value instanceof Blob ? value : value?.blob;
+      if (blob) store.put({ blob, name, createdAt: value?.createdAt || Date.now() }, id);
+    };
+    transaction.oncomplete = resolve;
+    transaction.onerror = () => reject(transaction.error);
   });
   database.close();
-  return blob;
+}
+
+function downloadWallpaper(wallpaper) {
+  const url = URL.createObjectURL(wallpaper.blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = wallpaper.name;
+  anchor.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 async function applyAppearance() {
   const backdrop = document.querySelector("#dashboardBackdrop");
   const definition = WALLPAPERS.find((wallpaper) => wallpaper.id === appState.settings.wallpaper && wallpaper.theme === appState.settings.theme)
     || WALLPAPERS.find((wallpaper) => wallpaper.id === "none" && wallpaper.theme === appState.settings.theme);
-  document.body.dataset.palette = appState.settings.wallpaper === "custom"
+  const isCustomWallpaper = appState.settings.wallpaper.startsWith("custom");
+  document.body.dataset.palette = isCustomWallpaper
     ? (appState.settings.theme === "light" ? "light-default" : "dark-default")
     : definition.palette;
   if (customWallpaperUrl) { URL.revokeObjectURL(customWallpaperUrl); customWallpaperUrl = ""; }
-  backdrop.className = `dashboard-backdrop wallpaper-${appState.settings.wallpaper}`;
+  backdrop.className = `dashboard-backdrop wallpaper-${isCustomWallpaper ? "custom" : appState.settings.wallpaper}`;
   backdrop.style.backgroundImage = "";
-  if (appState.settings.wallpaper === "custom") {
-    const blob = await getWallpaperBlob();
+  if (isCustomWallpaper) {
+    const blob = await getWallpaperBlob(appState.settings.wallpaper);
     if (blob) { customWallpaperUrl = URL.createObjectURL(blob); backdrop.style.backgroundImage = `url("${customWallpaperUrl}")`; }
   }
 }
 
 document.querySelector("#skipOnboarding").addEventListener("click", async () => { await setSetting("onboardingComplete", true); await refresh(); });
-document.addEventListener("click", (event) => { if (!event.target.closest("#contextMenu") && !event.target.closest("[data-board-menu]") && !event.target.closest("[data-page-options]")) nodes.contextMenu.hidden = true; });
+document.addEventListener("click", (event) => {
+  if (!event.target.closest("#contextMenu") && !event.target.closest("[data-board-menu]") && !event.target.closest("[data-page-options]")) nodes.contextMenu.hidden = true;
+  if (!event.target.closest("#appearancePanel") && !event.target.closest("#wallpaperTool")) closeAppearancePanel();
+});
 document.addEventListener("keydown", (event) => { if (event.key === "/" && !event.target.matches("input, textarea")) { event.preventDefault(); nodes.searchPanel.hidden = false; nodes.globalSearch.focus(); } });
 chrome.storage.onChanged.addListener((changes) => { if (changes[TABORA_STORAGE_KEY]) init(); });
 init();
