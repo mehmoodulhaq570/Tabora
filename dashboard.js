@@ -49,6 +49,12 @@ const WALLPAPERS = [
   { id: "amber-voyager", name: "Amber Voyager", theme: "light", palette: "amber", image: "assets/amber-voyager.png" }
 ];
 
+const PAGE_MENU_ICONS = {
+  rename: '<svg class="menu-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4l11-11-4-4L4 16v4Z"></path><path d="m13.5 6.5 4 4"></path></svg>',
+  share: '<svg class="menu-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="5" r="2.5"></circle><circle cx="6" cy="12" r="2.5"></circle><circle cx="18" cy="19" r="2.5"></circle><path d="m8.3 10.9 7.4-4.4M8.3 13.1l7.4 4.4"></path></svg>',
+  delete: '<svg class="menu-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 14h10l1-14M10 11v6M14 11v6"></path></svg>'
+};
+
 async function init() {
   appState = await getTaboraState();
   await applyAppearance();
@@ -479,10 +485,10 @@ async function copyPageLinks(page) {
 
 function pageMenuItems(page) {
   return [
-    { icon: "&#9998;", label: "Rename", action: () => openPageDialog(page) },
-    { icon: "&#128279;", label: "Share Page", action: () => copyPageLinks(page) },
+    { icon: PAGE_MENU_ICONS.rename, label: "Rename", action: () => openPageDialog(page) },
+    { icon: PAGE_MENU_ICONS.share, label: "Share Page", action: () => copyPageLinks(page) },
     { separator: true },
-    { icon: "&#128465;", label: "Delete", danger: true, action: async () => {
+    { icon: PAGE_MENU_ICONS.delete, label: "Delete", danger: true, action: async () => {
       if (page.protected) { showToast("The Home page cannot be deleted"); return; }
       if (window.confirm(`Delete ${page.name} and move its boards to Trash?`)) {
         await deletePage(page.id);

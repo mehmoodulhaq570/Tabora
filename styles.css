@@ -128,17 +128,18 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .page-tab-item {
   display: flex;
   flex: 0 0 auto;
-  height: 46px;
+  min-width: 102px;
+  height: 50px;
   overflow: hidden;
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: 14px;
   background: var(--surface-raised);
   color: var(--text);
 }
 .page-tab-item:hover, .page-tab-item.active { border-color: color-mix(in srgb, var(--green) 55%, transparent); background: var(--green); color: var(--green-dark); }
 
 .page-tab, .square-button {
-  height: 46px;
+  height: 50px;
   border: 1px solid var(--line);
   border-radius: 10px;
   background: var(--surface-raised);
@@ -147,7 +148,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 
 .page-tab {
   flex: 0 0 auto;
-  padding: 0 20px;
+  padding: 0 18px;
   font-size: 13px;
   font-weight: 800;
 }
@@ -157,17 +158,17 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   background: var(--green);
   color: var(--green-dark);
 }
-.page-tab-item .page-tab { height: 44px; max-width: 220px; overflow: hidden; border: 0; border-radius: 0; background: transparent; color: inherit; text-overflow: ellipsis; white-space: nowrap; }
+.page-tab-item .page-tab { height: 48px; flex: 1 1 auto; max-width: 220px; overflow: hidden; border: 0; border-radius: 0; background: transparent; color: inherit; text-overflow: ellipsis; white-space: nowrap; }
 .page-tab-item .page-tab:hover { background: transparent; color: inherit; }
-.page-options-button { display: grid; width: 34px; padding: 0; place-items: center; border: 0; border-left: 1px solid color-mix(in srgb, currentColor 18%, transparent); background: transparent; color: inherit; opacity: 0; pointer-events: none; transition: opacity 160ms ease, background-color 160ms ease; }
-.page-tab-item:hover .page-options-button, .page-tab-item:focus-within .page-options-button { opacity: 1; pointer-events: auto; }
+.page-options-button { display: grid; width: 28px; padding: 0; place-items: center; border: 0; border-left: 1px solid color-mix(in srgb, currentColor 18%, transparent); background: transparent; color: inherit; opacity: 0; pointer-events: none; transform: translateX(-4px); transition: opacity 160ms ease, transform 180ms ease, background-color 160ms ease; }
+.page-tab-item:hover .page-options-button, .page-tab-item:focus-within .page-options-button { opacity: 1; pointer-events: auto; transform: translateX(0); }
 .page-options-button:hover { background: color-mix(in srgb, currentColor 10%, transparent); }
 .page-options-button span { transform: translateY(-1px); font-size: 11px; }
 
 .square-button {
   display: grid;
-  flex: 0 0 46px;
-  width: 46px;
+  flex: 0 0 50px;
+  width: 50px;
   place-items: center;
 }
 
@@ -498,6 +499,8 @@ textarea.dark-input { min-height: 92px; padding-top: 10px; resize: vertical; }
   backdrop-filter: blur(18px);
 }
 .context-menu button { display: grid; grid-template-columns: 24px minmax(0, 1fr); align-items: center; min-height: 38px; padding: 0 10px; border: 0; border-radius: 6px; background: transparent; color: #dbe8e3; text-align: left; }
+.context-menu button > span:first-child { display: grid; width: 24px; height: 24px; place-items: center; }
+.context-menu .menu-icon { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .context-menu button:hover { background: rgba(255, 255, 255, 0.07); color: white; }
 .context-menu hr { width: 100%; border: 0; border-top: 1px solid var(--line); }
 .context-menu .danger-menu-item { color: var(--danger); }
