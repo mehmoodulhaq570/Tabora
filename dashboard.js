@@ -1191,8 +1191,21 @@ nodes.trashList.addEventListener("click", async (event) => {
     await refresh(item?.type === "link" ? "Bookmark restored" : "Board restored");
     renderTrash();
   }
-  if (deleteButton && window.confirm("Permanently delete this item?")) {
-    await deleteTrashItem(Number(deleteButton.dataset.deleteTrashIndex));
+  if (deleteButton) {
+    const index = Number(deleteButton.dataset.deleteTrashIndex);
+    const item = appState.trash[index];
+    if (!item) return;
+    const itemName = item.type === "link" ? item.value.title : item.value.name;
+    const confirmed = await requestDeleteConfirmation({
+      title: "Permanently Delete",
+      prompt: `Permanently delete "${itemName}" from trash? You cannot undo this action.`,
+      warning: "",
+      caution: "",
+      compact: true,
+      submitLabel: "Delete"
+    });
+    if (!confirmed) return;
+    await deleteTrashItem(index);
     await refresh("Item permanently deleted");
     renderTrash();
   }
