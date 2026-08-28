@@ -69,10 +69,10 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 }
 
 .dashboard-shell {
-  width: min(1320px, calc(100% - 148px));
+  width: min(1500px, calc(100% - 200px));
   min-height: 100vh;
   margin: 0 auto;
-  padding: 18px 0 90px;
+  padding: 28px 0 110px;
 }
 
 .page-header {
@@ -81,13 +81,14 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   z-index: 20;
   display: flex;
   align-items: center;
-  gap: 10px;
-  min-height: 64px;
-  padding: 8px 0 12px;
+  gap: 18px;
+  min-height: 82px;
+  padding: 8px 0 20px;
   border-bottom: 1px solid var(--line);
   background: var(--header-bg);
   backdrop-filter: blur(20px);
 }
+.page-header::before { content: ""; position: absolute; top: -28px; left: 50%; z-index: -1; width: 100vw; height: 110px; background: var(--header-bg); transform: translateX(-50%); }
 
 .brand-mark {
   position: relative;
@@ -111,10 +112,11 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   display: flex;
   align-items: center;
   flex: 0 1 auto;
-  gap: 8px;
+  gap: 18px;
   min-width: 0;
   overflow-x: auto;
   scrollbar-width: none;
+  margin-left: 5px;
 }
 
 .page-tabs::-webkit-scrollbar { display: none; }
@@ -122,7 +124,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .page-tab-item {
   display: flex;
   flex: 0 0 auto;
-  height: 38px;
+  height: 50px;
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -132,7 +134,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .page-tab-item:hover, .page-tab-item.active { border-color: color-mix(in srgb, var(--green) 55%, transparent); background: var(--green); color: var(--green-dark); }
 
 .page-tab, .square-button {
-  height: 38px;
+  height: 50px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--surface-raised);
@@ -141,9 +143,9 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 
 .page-tab {
   flex: 0 0 auto;
-  padding: 0 18px;
+  padding: 0 26px;
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 800;
 }
 
 .page-tab:hover, .page-tab.active {
@@ -151,16 +153,16 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   background: var(--green);
   color: var(--green-dark);
 }
-.page-tab-item .page-tab { height: 36px; max-width: 190px; overflow: hidden; border: 0; border-radius: 0; background: transparent; color: inherit; text-overflow: ellipsis; white-space: nowrap; }
+.page-tab-item .page-tab { height: 48px; max-width: 220px; overflow: hidden; border: 0; border-radius: 0; background: transparent; color: inherit; text-overflow: ellipsis; white-space: nowrap; }
 .page-tab-item .page-tab:hover { background: transparent; color: inherit; }
-.page-options-button { display: grid; width: 30px; padding: 0; place-items: center; border: 0; border-left: 1px solid color-mix(in srgb, currentColor 18%, transparent); background: transparent; color: inherit; }
+.page-options-button { display: grid; width: 34px; padding: 0; place-items: center; border: 0; border-left: 1px solid color-mix(in srgb, currentColor 18%, transparent); background: transparent; color: inherit; }
 .page-options-button:hover { background: color-mix(in srgb, currentColor 10%, transparent); }
 .page-options-button span { transform: translateY(-1px); font-size: 11px; }
 
 .square-button {
   display: grid;
-  flex: 0 0 38px;
-  width: 38px;
+  flex: 0 0 50px;
+  width: 50px;
   place-items: center;
 }
 
@@ -268,7 +270,7 @@ textarea.dark-input { min-height: 92px; padding-top: 10px; resize: vertical; }
 
 .floating-search input { width: 100%; height: 46px; border: 0; background: transparent; color: var(--text); outline: 0; }
 
-.workspace-main { min-height: calc(100vh - 84px); padding-top: 24px; }
+.workspace-main { min-height: calc(100vh - 110px); padding-top: 26px; }
 .workspace-summary { display: flex; align-items: end; justify-content: space-between; min-height: 54px; margin-bottom: 14px; }
 .eyebrow { display: block; margin-bottom: 3px; color: var(--green); font-size: 10px; font-weight: 800; text-transform: uppercase; }
 .workspace-summary h1 { margin: 0; font-size: 24px; line-height: 1.1; }
@@ -280,10 +282,10 @@ textarea.dark-input { min-height: 92px; padding-top: 10px; resize: vertical; }
   position: relative;
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  min-height: calc(100vh - 132px);
+  min-height: calc(100vh - 164px);
   align-items: start;
   align-content: start;
-  gap: 14px;
+  gap: 24px;
 }
 
 .board-column {
@@ -291,21 +293,22 @@ textarea.dark-input { min-height: 92px; padding-top: 10px; resize: vertical; }
   min-width: 0;
   min-height: 72px;
   align-content: start;
-  gap: 14px;
+  gap: 24px;
 }
 
 .board-card {
+  min-height: 152px;
   min-width: 0;
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--surface);
-  box-shadow: var(--shadow);
-  backdrop-filter: blur(16px);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.18);
+  backdrop-filter: blur(14px);
   transition: transform 150ms ease, border-color 150ms ease, background 150ms ease;
 }
 
-.board-card:hover { border-color: rgba(82, 202, 131, 0.42); background: rgba(11, 34, 28, 0.95); transform: translateY(-2px); }
+.board-card:hover { border-color: var(--line-strong); background: color-mix(in srgb, var(--surface) 94%, var(--text) 6%); transform: translateY(-1px); }
 .board-card.dragging, .bookmark-row.dragging { opacity: 0.45; }
 .organize-mode .board-card { cursor: grab; }
 .organize-mode .board-card:active { cursor: grabbing; }
@@ -315,13 +318,13 @@ textarea.dark-input { min-height: 92px; padding-top: 10px; resize: vertical; }
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  min-height: 48px;
-  margin: 0 13px;
+  min-height: 63px;
+  margin: 0 18px;
   border-bottom: 1px solid var(--line);
 }
 
 .board-title { display: flex; align-items: center; min-width: 0; }
-.board-title h2 { margin: 0; overflow: hidden; font-size: 15px; line-height: 1.25; text-overflow: ellipsis; white-space: nowrap; }
+.board-title h2 { margin: 0; overflow: hidden; font-size: 15px; font-weight: 800; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }
 .drag-grip { display: none; margin-right: 6px; color: var(--green); font-size: 12px; }
 .organize-mode .drag-grip { display: inline; }
 .board-actions { display: flex; flex: 0 0 auto; align-items: center; gap: 2px; opacity: 0; transition: opacity 150ms ease; }
@@ -343,23 +346,23 @@ textarea.dark-input { min-height: 92px; padding-top: 10px; resize: vertical; }
 .icon-link-plus::before { content: "\1F517"; position: absolute; inset: -1px 0 0; font-size: 15px; }
 .icon-link-plus::after { content: "+"; position: absolute; top: -5px; right: -3px; color: var(--green); font-size: 13px; font-weight: 900; }
 
-.board-links { display: grid; gap: 3px; min-height: 34px; padding: 9px; }
-.bookmark-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; min-width: 0; min-height: 38px; border: 1px solid rgba(151, 202, 181, 0.13); border-radius: 6px; background: rgba(255, 255, 255, 0.035); }
-.bookmark-row:hover { border-color: rgba(82, 202, 131, 0.26); background: rgba(82, 202, 131, 0.08); }
-.bookmark-row > a { display: grid; grid-template-columns: 22px minmax(0, 1fr); align-items: center; gap: 9px; min-width: 0; padding: 6px 8px; color: var(--text); text-decoration: none; }
+.board-links { display: grid; gap: 3px; min-height: 70px; padding: 12px 18px 16px; }
+.bookmark-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; min-width: 0; min-height: 43px; border: 0; border-radius: 6px; background: transparent; }
+.bookmark-row:hover { background: color-mix(in srgb, var(--green) 9%, transparent); }
+.bookmark-row > a { display: grid; grid-template-columns: 24px minmax(0, 1fr); align-items: center; gap: 12px; min-width: 0; padding: 7px 6px; color: var(--text); text-decoration: none; }
 .bookmark-copy { display: grid; min-width: 0; gap: 1px; }
 .bookmark-copy strong, .bookmark-copy small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.bookmark-copy strong { font-size: 12px; font-weight: 650; }
+.bookmark-copy strong { font-size: 12px; font-weight: 600; }
 .bookmark-copy small { color: var(--muted); font-size: 9px; }
-.favicon { width: 20px; height: 20px; border-radius: 5px; object-fit: cover; }
+.favicon { width: 22px; height: 22px; border-radius: 5px; object-fit: cover; }
 .favicon.fallback { display: grid; place-items: center; background: linear-gradient(145deg, #3673ce, #4bc47c); color: white; font-size: 10px; font-weight: 900; }
 .link-actions { display: none; align-items: center; padding-right: 4px; }
 .bookmark-row:hover .link-actions, .organize-mode .link-actions { display: flex; }
 .link-actions button:last-child:hover { color: var(--danger); }
 
-.empty-board-link { min-height: 38px; border: 1px dashed var(--line); border-radius: 6px; background: transparent; color: var(--muted); font-size: 11px; }
+.empty-board-link { min-height: 50px; visibility: hidden; border: 0; background: transparent; }
 .empty-board-link:hover { border-color: var(--green); color: var(--green); }
-.board-footer { display: flex; align-items: center; justify-content: space-between; min-height: 40px; margin: 0 13px; border-top: 1px solid var(--line); color: var(--muted); font-size: 10px; }
+.board-footer { display: none; }
 .board-footer button { padding: 5px 7px; border: 0; border-radius: 5px; background: transparent; color: var(--green); font-size: 11px; font-weight: 800; }
 .board-footer button:hover { background: rgba(82, 202, 131, 0.1); }
 
@@ -413,18 +416,19 @@ textarea.dark-input { min-height: 92px; padding-top: 10px; resize: vertical; }
 
 .tool-rail {
   position: fixed;
-  top: 50%;
-  right: 22px;
+  top: auto;
+  right: 33px;
+  bottom: 34px;
   z-index: 30;
   display: grid;
-  gap: 12px;
-  transform: translateY(-50%);
+  gap: 27px;
+  transform: none;
 }
 
 .rail-button, .wallpaper-button {
   display: grid;
-  width: 58px;
-  height: 58px;
+  width: 68px;
+  height: 68px;
   place-items: center;
   border: 1px solid var(--line-strong);
   border-radius: 50%;
@@ -440,7 +444,7 @@ textarea.dark-input { min-height: 92px; padding-top: 10px; resize: vertical; }
 .rail-icon { width: 27px; height: 27px; overflow: visible; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
 .rail-icon-incognito { width: 29px; height: 29px; }
 .rail-icon-settings { width: 28px; height: 28px; stroke-width: 2; }
-.wallpaper-button { position: fixed; bottom: 18px; left: 18px; z-index: 30; }
+.wallpaper-button { position: fixed; bottom: 34px; left: 30px; z-index: 30; }
 .wallpaper-button:hover { border-color: var(--green); color: var(--green); }
 
 .icon-search::before { content: ""; position: absolute; inset: 2px 5px 5px 2px; border: 2px solid currentColor; border-radius: 50%; }
@@ -552,11 +556,10 @@ textarea.dark-input { min-height: 92px; padding-top: 10px; resize: vertical; }
 .settings-info p { max-width: 560px; margin: 0; color: var(--muted); line-height: 1.6; }
 .support-actions { display: flex; gap: 10px; }
 
-.compact-mode .board-grid, .compact-mode .board-column { gap: 10px; }
-.compact-mode .board-card { min-height: 150px; }
-.compact-mode .board-header { padding: 10px 12px 7px; }
-.compact-mode .bookmark-row { min-height: 34px; }
-.compact-mode .board-footer { min-height: 36px; }
+.compact-mode .board-grid, .compact-mode .board-column { gap: 20px; }
+.compact-mode .board-card { min-height: 136px; }
+.compact-mode .board-header { padding: 0; }
+.compact-mode .bookmark-row { min-height: 43px; }
 .hide-extra-bookmarks .board-links .bookmark-row:nth-child(n + 7) { display: none; }
 .shorten-titles .bookmark-copy strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .hide-bookmark-descriptions .bookmark-copy small { display: none; }
