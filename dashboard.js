@@ -59,9 +59,19 @@ const WALLPAPERS = [
   { id: "none", name: "Default", theme: "dark", palette: "dark-default", image: "" },
   { id: "digital-ocean", name: "Digital Ocean", theme: "dark", palette: "forest", image: "assets/tabora-background.png" },
   { id: "crimson-realm", name: "Crimson Realm", theme: "dark", palette: "crimson", image: "assets/crimson-realm.png" },
+  { id: "aurora-station", name: "Aurora Station", theme: "dark", palette: "aurora", image: "assets/aurora-station.webp" },
+  { id: "moonlit-garden", name: "Moonlit Garden", theme: "dark", palette: "garden", image: "assets/moonlit-garden.webp" },
+  { id: "eclipse-forge", name: "Eclipse Forge", theme: "dark", palette: "eclipse", image: "assets/eclipse-forge.webp" },
+  { id: "abyss-bloom", name: "Abyss Bloom", theme: "dark", palette: "abyss", image: "assets/abyss-bloom.webp" },
+  { id: "neon-monsoon", name: "Neon Monsoon", theme: "dark", palette: "monsoon", image: "assets/neon-monsoon.webp" },
   { id: "none", name: "Default", theme: "light", palette: "light-default", image: "" },
   { id: "mist-valley", name: "Mist Valley", theme: "light", palette: "mist", image: "assets/mist-valley.png" },
-  { id: "amber-voyager", name: "Amber Voyager", theme: "light", palette: "amber", image: "assets/amber-voyager.png" }
+  { id: "amber-voyager", name: "Amber Voyager", theme: "light", palette: "amber", image: "assets/amber-voyager.png" },
+  { id: "alpine-clear", name: "Alpine Clear", theme: "light", palette: "alpine", image: "assets/alpine-clear.webp" },
+  { id: "coral-coast", name: "Coral Coast", theme: "light", palette: "coast", image: "assets/coral-coast.webp" },
+  { id: "glass-horizon", name: "Glass Horizon", theme: "light", palette: "glass", image: "assets/glass-horizon.webp" },
+  { id: "sakura-drift", name: "Sakura Drift", theme: "light", palette: "sakura", image: "assets/sakura-drift.webp" },
+  { id: "arctic-prism", name: "Arctic Prism", theme: "light", palette: "arctic", image: "assets/arctic-prism.webp" }
 ];
 
 const PAGE_MENU_ICONS = {
@@ -1459,7 +1469,7 @@ document.querySelector("#wallpaperUpload").addEventListener("change", async (eve
   event.target.value = "";
 });
 
-document.querySelector("#moreWallpapers").addEventListener("click", () => showToast("More original Tabora wallpapers are coming next"));
+document.querySelector("#moreWallpapers").addEventListener("click", () => showToast("More original Tabora themes are coming next"));
 
 function openWallpaperDatabase() {
   return new Promise((resolve, reject) => {

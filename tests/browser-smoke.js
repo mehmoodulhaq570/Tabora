@@ -75,7 +75,36 @@ async function waitForTargets() {
   assert.equal(page.tool, true);
   assert.equal(page.horizontalOverflow, false);
 
+  const themes = await client.evaluate(`(async () => {
+    document.querySelector("#wallpaperTool").click();
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    const count = document.querySelectorAll("#wallpaperGrid [data-wallpaper]").length;
+    document.querySelector('[data-wallpaper="eclipse-forge"]').click();
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    const darkPalette = document.body.dataset.palette;
+    const darkImage = getComputedStyle(document.querySelector("#dashboardBackdrop")).backgroundImage;
+    document.querySelector('#appearancePanel [data-theme="light"]').click();
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    document.querySelector('[data-wallpaper="sakura-drift"]').click();
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    return {
+      darkCount: count,
+      lightCount: document.querySelectorAll("#wallpaperGrid [data-wallpaper]").length,
+      darkPalette,
+      darkImage,
+      lightPalette: document.body.dataset.palette,
+      lightImage: getComputedStyle(document.querySelector("#dashboardBackdrop")).backgroundImage
+    };
+  })()`);
+  assert.equal(themes.darkCount, 8);
+  assert.equal(themes.lightCount, 8);
+  assert.equal(themes.darkPalette, "eclipse");
+  assert.match(themes.darkImage, /eclipse-forge\.webp/);
+  assert.equal(themes.lightPalette, "sakura");
+  assert.match(themes.lightImage, /sakura-drift\.webp/);
+
   const hub = await client.evaluate(`(async () => {
+    document.querySelector("#appearancePanel").hidden = true;
     document.querySelector("#featureTool").click();
     await new Promise((resolve) => setTimeout(resolve, 500));
     const dialog = document.querySelector("#featureDialog");
