@@ -13,6 +13,10 @@ const nodes = {
   boardDialog: document.querySelector("#boardDialog"),
   boardForm: document.querySelector("#boardForm"),
   boardName: document.querySelector("#boardName"),
+  boardIcon: document.querySelector("#boardIcon"),
+  boardColor: document.querySelector("#boardColor"),
+  boardSize: document.querySelector("#boardSize"),
+  boardPinned: document.querySelector("#boardPinned"),
   editingBoardId: document.querySelector("#editingBoardId"),
   linkDialog: document.querySelector("#linkDialog"),
   linkForm: document.querySelector("#linkForm"),
@@ -72,6 +76,15 @@ const BOARD_MENU_ICONS = {
   move: '<svg class="menu-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M14 7l5 5-5 5"></path></svg>'
 };
 
+const BOARD_ICONS = {
+  folder: '<svg viewBox="0 0 24 24"><path d="M3 6h7l2 2h9v11H3V6Z"></path></svg>',
+  briefcase: '<svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2"></rect><path d="M8 7V4h8v3M3 12h18"></path></svg>',
+  book: '<svg viewBox="0 0 24 24"><path d="M4 4h6a3 3 0 0 1 3 3v13a3 3 0 0 0-3-3H4V4Z"></path><path d="M20 4h-4a3 3 0 0 0-3 3v13a3 3 0 0 1 3-3h4V4Z"></path></svg>',
+  star: '<svg viewBox="0 0 24 24"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-2.9-5.6 2.9 1.1-6.2L3 9.6l6.2-.9L12 3Z"></path></svg>',
+  code: '<svg viewBox="0 0 24 24"><path d="m8 7-5 5 5 5M16 7l5 5-5 5M14 4l-4 16"></path></svg>',
+  spark: '<svg viewBox="0 0 24 24"><path d="m12 3 2 6 6 2-6 2-2 6-2-6-6-2 6-2 2-6Z"></path></svg>'
+};
+
 async function init() {
   appState = await getTaboraState();
   await applyAppearance();
@@ -83,7 +96,8 @@ function activePage() {
 }
 
 function activeBoards() {
-  return ordered(appState.boards.filter((board) => board.pageId === activePage().id));
+  return ordered(appState.boards.filter((board) => board.pageId === activePage().id))
+    .sort((a, b) => Number(b.pinned) - Number(a.pinned) || (a.order || 0) - (b.order || 0));
 }
 
 function render() {
@@ -128,7 +142,7 @@ function renderBoards() {
   for (let columnIndex = 0; columnIndex < columns.length; columnIndex += 1) {
     boards
       .filter((board) => board.column === columnIndex)
-      .sort((a, b) => (a.columnOrder || 0) - (b.columnOrder || 0))
+      .sort((a, b) => Number(b.pinned) - Number(a.pinned) || (a.columnOrder || 0) - (b.columnOrder || 0))
       .forEach((board) => columns[columnIndex].append(createBoardCard(board, query)));
   }
   if (!query) nodes.boardGrid.append(createAddBoardTile());
@@ -153,6 +167,8 @@ function createAddBoardTile() {
 function createBoardCard(board, query) {
   const card = document.createElement("article");
   card.className = "board-card";
+  card.classList.add(`board-size-${board.size || "medium"}`, `board-color-${board.color || "green"}`);
+  card.classList.toggle("pinned", Boolean(board.pinned));
   card.dataset.boardId = board.id;
   card.dataset.column = String(board.column);
   card.dataset.columnOrder = String(board.columnOrder);
@@ -161,7 +177,7 @@ function createBoardCard(board, query) {
   const header = document.createElement("header");
   header.className = "board-header";
   header.innerHTML = `
-    <div class="board-title"><svg class="drag-grip" viewBox="0 0 18 18" aria-hidden="true"><circle cx="5" cy="4" r="1"></circle><circle cx="13" cy="4" r="1"></circle><circle cx="5" cy="9" r="1"></circle><circle cx="13" cy="9" r="1"></circle><circle cx="5" cy="14" r="1"></circle><circle cx="13" cy="14" r="1"></circle></svg><h2></h2></div>
+    <div class="board-title"><svg class="drag-grip" viewBox="0 0 18 18" aria-hidden="true"><circle cx="5" cy="4" r="1"></circle><circle cx="13" cy="4" r="1"></circle><circle cx="5" cy="9" r="1"></circle><circle cx="13" cy="9" r="1"></circle><circle cx="5" cy="14" r="1"></circle><circle cx="13" cy="14" r="1"></circle></svg><span class="board-symbol">${BOARD_ICONS[board.icon] || BOARD_ICONS.folder}</span><h2></h2><span class="board-pin" aria-label="Pinned">${board.pinned ? "Pinned" : ""}</span></div>
     <div class="board-actions">
       <button class="board-icon-button" data-add-link="${board.id}" title="Add link" aria-label="Add link"><svg class="board-action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13a4.5 4.5 0 0 0 6.4.1l2-2a4.5 4.5 0 0 0-6.3-6.4l-1.2 1.2"></path><path d="M14 11a4.5 4.5 0 0 0-6.4-.1l-2 2a4.5 4.5 0 0 0 6.3 6.4l1.2-1.2"></path><path class="icon-accent" d="M19 16v5M16.5 18.5h5"></path></svg></button>
       <button class="board-icon-button" data-board-menu="${board.id}" title="Board options" aria-label="Board options"><svg class="board-action-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg></button>
@@ -215,6 +231,12 @@ function createLinkRow(board, link) {
   domain.className = "private-detail";
   domain.textContent = link.note || getDomain(link.url);
   copy.append(title, domain);
+  if (link.health?.status && link.health.status !== "ok") {
+    const health = document.createElement("i");
+    health.className = `link-health link-health-${link.health.status}`;
+    health.title = link.health.status === "redirected" ? "This link redirects" : "This link may be unavailable";
+    copy.append(health);
+  }
   anchor.append(copy);
 
   const actions = document.createElement("span");
@@ -323,7 +345,11 @@ function openPageDialog(page = null) {
 function openBoardDialog(board = null) {
   nodes.editingBoardId.value = board?.id || "";
   nodes.boardName.value = board?.name || "";
-  document.querySelector("#boardDialogTitle").textContent = board ? "Rename board" : "Add board";
+  nodes.boardIcon.value = board?.icon || "folder";
+  nodes.boardColor.value = board?.color || "green";
+  nodes.boardSize.value = board?.size || "medium";
+  nodes.boardPinned.checked = Boolean(board?.pinned);
+  document.querySelector("#boardDialogTitle").textContent = board ? "Customize board" : "Add board";
   nodes.boardDialog.showModal();
   nodes.boardName.focus();
 }
@@ -415,12 +441,17 @@ function showInlineLinkDetails(editor, url, metadata) {
     if (!normalizedUrl) { showToast("Enter a valid web address"); urlInput.focus(); return; }
     const submitButton = form.querySelector('[type="submit"]');
     submitButton.disabled = true;
-    await addLink(editor.dataset.boardId, {
+    const added = await addLink(editor.dataset.boardId, {
       url: normalizedUrl,
       title: titleInput.value,
       note: noteInput.value,
       favIconUrl: metadata.favIconUrl
     });
+    if (added.result?.duplicate) {
+      submitButton.disabled = false;
+      showToast(`Already saved in ${added.result.page?.name || "Home"} / ${added.result.board.name}`, "warning");
+      return;
+    }
     await refresh("Link added");
   });
   titleInput.focus();
@@ -496,7 +527,8 @@ function boardMenuItems(board) {
   const items = [
     { icon: BOARD_MENU_ICONS.open, label: "Open all links", action: () => openBoard(board) },
     { icon: BOARD_MENU_ICONS.add, label: "Add link", action: () => openInlineLinkEditor(board.id) },
-    { icon: PAGE_MENU_ICONS.rename, label: "Rename board", action: () => openBoardDialog(board) },
+    { icon: PAGE_MENU_ICONS.rename, label: "Customize board", action: () => openBoardDialog(board) },
+    { icon: BOARD_ICONS.star.replace("<svg", '<svg class="menu-icon"'), label: board.pinned ? "Unpin board" : "Pin board", action: async () => { await customizeBoard(board.id, { pinned: !board.pinned }); await refresh(board.pinned ? "Board unpinned" : "Board pinned"); } },
     { icon: PAGE_MENU_ICONS.share, label: "Share / copy links", action: () => copyBoardLinks(board) }
   ];
   const otherPages = ordered(appState.pages).filter((page) => page.id !== board.pageId);
@@ -526,6 +558,8 @@ async function openBoard(board) {
 
 async function openSingleLink(link) {
   try {
+    const board = appState.boards.find((item) => item.links.some((candidate) => candidate.id === link.id));
+    if (board) await recordLinkOpened(board.id, link.id);
     if (appState.settings.incognitoMode) {
       await chrome.windows.create({ url: link.url, incognito: true, focused: true });
     } else if (appState.settings.openLinksInNewTab) {
@@ -707,21 +741,38 @@ nodes.boardForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (!nodes.boardName.value.trim()) return;
   const editing = Boolean(nodes.editingBoardId.value);
-  if (editing) await renameBoard(nodes.editingBoardId.value, nodes.boardName.value);
+  if (editing) await customizeBoard(nodes.editingBoardId.value, {
+    name: nodes.boardName.value,
+    icon: nodes.boardIcon.value,
+    color: nodes.boardColor.value,
+    size: nodes.boardSize.value,
+    pinned: nodes.boardPinned.checked
+  });
   else {
-    await addBoard(activePage().id, nodes.boardName.value, [], boardInsertionPlacement);
+    const created = await addBoard(activePage().id, nodes.boardName.value, [], boardInsertionPlacement);
+    await customizeBoard(created.result.id, {
+      icon: nodes.boardIcon.value,
+      color: nodes.boardColor.value,
+      size: nodes.boardSize.value,
+      pinned: nodes.boardPinned.checked
+    });
     boardInsertionPlacement = { ...boardInsertionPlacement, order: boardInsertionPlacement.order + 1 };
   }
   nodes.boardDialog.close();
-  await refresh(editing ? "Board renamed" : "Board created");
+  await refresh(editing ? "Board updated" : "Board created");
 });
 
 nodes.linkForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   const values = { title: nodes.linkTitle.value, url: nodes.linkUrl.value, note: nodes.linkNote.value };
   if (!normalizeUrl(values.url)) { showToast("Enter a valid web address"); return; }
-  if (nodes.editingLinkId.value) await updateLink(nodes.linkBoardId.value, nodes.editingLinkId.value, values);
-  else await addLink(nodes.linkBoardId.value, values);
+  const saved = nodes.editingLinkId.value
+    ? await updateLink(nodes.linkBoardId.value, nodes.editingLinkId.value, values)
+    : await addLink(nodes.linkBoardId.value, values);
+  if (saved.result?.duplicate) {
+    showToast(`Already saved in ${saved.result.page?.name || "Home"} / ${saved.result.board.name}`, "warning");
+    return;
+  }
   nodes.linkDialog.close();
   await refresh(nodes.editingLinkId.value ? "Link updated" : "Link added");
 });
@@ -809,7 +860,7 @@ document.querySelector("#organizeDelete").addEventListener("click", async () => 
       board.links = board.links.filter((link) => !selectedOrganizeLinks.has(`${board.id}:${link.id}`));
       board.links.forEach((link, index) => { link.order = index; });
     }
-  });
+  }, { undoLabel: "Bookmark deletion" });
   const deletedCount = selectedOrganizeLinks.size;
   selectedOrganizeLinks.clear();
   await refresh(`${deletedCount} ${deletedCount === 1 ? "bookmark" : "bookmarks"} deleted`);

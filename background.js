@@ -19,10 +19,24 @@ chrome.commands.onCommand.addListener(async (command) => {
   const pageId = state.settings.quickSaveDestination === "home"
     ? "home"
     : state.settings.activePageId;
+  const duplicate = findDuplicateLink(state, tab.url);
+  if (duplicate) {
+    await chrome.action.setBadgeBackgroundColor({ color: "#f5bd48" });
+    await chrome.action.setBadgeText({ text: "!" });
+    await chrome.action.setTitle({ title: `Already saved in ${duplicate.page?.name || "Home"} / ${duplicate.board.name}` });
+    setTimeout(() => chrome.action.setBadgeText({ text: "" }), 3000);
+    return;
+  }
   let board = state.boards.find((item) => item.pageId === pageId && item.name === "Quick Saves");
   if (!board) {
     const created = await addBoard(pageId, "Quick Saves");
     board = created.result;
   }
-  await addLink(board.id, { title: tab.title, url: tab.url, favIconUrl: tab.favIconUrl || "" });
+  const added = await addLink(board.id, { title: tab.title, url: tab.url, favIconUrl: tab.favIconUrl || "" });
+  if (added.result?.duplicate) {
+    await chrome.action.setBadgeBackgroundColor({ color: "#f5bd48" });
+    await chrome.action.setBadgeText({ text: "!" });
+    await chrome.action.setTitle({ title: `Already saved in ${added.result.page?.name || "Home"} / ${added.result.board.name}` });
+    setTimeout(() => chrome.action.setBadgeText({ text: "" }), 3000);
+  }
 });

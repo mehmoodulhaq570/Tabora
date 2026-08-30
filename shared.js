@@ -1,5 +1,6 @@
 const TABORA_STORAGE_KEY = "taboraV2";
-const TABORA_SCHEMA_VERSION = 3;
+const TABORA_UNDO_KEY = "taboraUndo";
+const TABORA_SCHEMA_VERSION = 4;
 const TABORA_BOARD_COLUMNS = 4;
 
 function makeId(prefix) {
@@ -12,6 +13,9 @@ function createDefaultState() {
     pages: [{ id: "home", name: "Home", order: 0, protected: true }],
     boards: [],
     trash: [],
+    recentlyOpened: [],
+    moods: [],
+    vaults: [],
     settings: {
       activePageId: "home",
       theme: "dark",
@@ -28,6 +32,7 @@ function createDefaultState() {
       closeTabsAfterSaveAll: false,
       quickSaveDestination: "current-page",
       language: "en",
+      activeMoodId: "",
       onboardingComplete: false
     }
   };
@@ -39,6 +44,16 @@ function normalizeState(value) {
   state.schemaVersion = TABORA_SCHEMA_VERSION;
   state.pages = Array.isArray(state.pages) && state.pages.length ? state.pages : fallback.pages;
   state.boards = Array.isArray(state.boards) ? state.boards : [];
+  for (const board of state.boards) {
+    board.color = board.color || "green";
+    board.icon = board.icon || "folder";
+    board.size = ["small", "medium", "large"].includes(board.size) ? board.size : "medium";
+    board.pinned = Boolean(board.pinned || board.starred);
+    board.links = Array.isArray(board.links) ? board.links : [];
+    for (const link of board.links) {
+      link.health = link.health && typeof link.health === "object" ? link.health : null;
+    }
+  }
   for (const page of state.pages) {
     const pageBoards = [...state.boards]
       .filter((board) => board.pageId === page.id)
@@ -58,6 +73,9 @@ function normalizeState(value) {
     }
   }
   state.trash = Array.isArray(state.trash) ? state.trash : [];
+  state.recentlyOpened = Array.isArray(state.recentlyOpened) ? state.recentlyOpened.slice(0, 50) : [];
+  state.moods = Array.isArray(state.moods) ? state.moods : [];
+  state.vaults = Array.isArray(state.vaults) ? state.vaults : [];
   state.settings = { ...fallback.settings, ...(state.settings || {}) };
   if (!state.pages.some((page) => page.id === state.settings.activePageId)) {
     state.settings.activePageId = state.pages[0].id;
@@ -90,6 +108,10 @@ function migrateV1Data(sessions = [], workspaces = []) {
       column: index % TABORA_BOARD_COLUMNS,
       columnOrder: Math.floor(index / TABORA_BOARD_COLUMNS),
       starred: Boolean(session.starred),
+      pinned: Boolean(session.starred),
+      color: "green",
+      icon: "folder",
+      size: "medium",
       createdAt: session.createdAt || Date.now() + index,
       links: (session.tabs || []).map((tab, linkIndex) => ({
         id: makeId(`link-${linkIndex}`),
@@ -134,8 +156,28 @@ async function saveTaboraState(state) {
   return normalized;
 }
 
-async function updateTaboraState(updater) {
+async function saveUndoSnapshot(state, label = "Last change") {
+  const snapshot = structuredClone(state);
+  snapshot.settings.organizeMode = false;
+  await chrome.storage.local.set({ [TABORA_UNDO_KEY]: { label, state: snapshot, savedAt: Date.now() } });
+}
+
+async function getUndoSnapshot() {
+  const data = await chrome.storage.local.get(TABORA_UNDO_KEY);
+  return data[TABORA_UNDO_KEY] || null;
+}
+
+async function undoLastAction() {
+  const snapshot = await getUndoSnapshot();
+  if (!snapshot?.state) return null;
+  await saveTaboraState(snapshot.state);
+  await chrome.storage.local.remove(TABORA_UNDO_KEY);
+  return snapshot.label;
+}
+
+async function updateTaboraState(updater, options = {}) {
   const state = await getTaboraState();
+  if (options.undoLabel) await saveUndoSnapshot(state, options.undoLabel);
   const result = await updater(state);
   await saveTaboraState(state);
   return { state, result };
@@ -203,7 +245,7 @@ async function deletePage(pageId) {
     state.pages = state.pages.filter((item) => item.id !== pageId);
     state.settings.activePageId = "home";
     return true;
-  });
+  }, { undoLabel: "Page deletion" });
 }
 
 async function addBoard(pageId, name, links = [], placement = null) {
@@ -226,6 +268,10 @@ async function addBoard(pageId, name, links = [], placement = null) {
       column,
       columnOrder,
       starred: false,
+      pinned: false,
+      color: "green",
+      icon: "folder",
+      size: "medium",
       createdAt: Date.now(),
       links: links.map((link, index) => ({
         id: link.id || makeId("link"),
@@ -249,6 +295,19 @@ async function renameBoard(boardId, name) {
   });
 }
 
+async function customizeBoard(boardId, values = {}) {
+  return updateTaboraState((state) => {
+    const board = state.boards.find((item) => item.id === boardId);
+    if (!board) return null;
+    if (values.name !== undefined) board.name = cleanName(values.name, board.name);
+    if (["green", "blue", "amber", "rose", "violet", "slate"].includes(values.color)) board.color = values.color;
+    if (["folder", "briefcase", "book", "star", "code", "spark"].includes(values.icon)) board.icon = values.icon;
+    if (["small", "medium", "large"].includes(values.size)) board.size = values.size;
+    if (values.pinned !== undefined) board.pinned = Boolean(values.pinned);
+    return board;
+  }, { undoLabel: "Board customization" });
+}
+
 async function moveBoard(boardId, pageId) {
   return updateTaboraState((state) => {
     const board = state.boards.find((item) => item.id === boardId);
@@ -258,7 +317,7 @@ async function moveBoard(boardId, pageId) {
     const destinationBoards = state.boards.filter((item) => item.pageId === pageId && item.id !== board.id);
     board.column = destinationBoards.length % TABORA_BOARD_COLUMNS;
     board.columnOrder = destinationBoards.filter((item) => item.column === board.column).length;
-  });
+  }, { undoLabel: "Board move" });
 }
 
 async function deleteBoard(boardId) {
@@ -268,7 +327,7 @@ async function deleteBoard(boardId) {
     const page = state.pages.find((item) => item.id === board.pageId);
     state.trash.unshift({ type: "board", value: structuredClone(board), pageName: page?.name || "Home", deletedAt: Date.now() });
     state.boards = state.boards.filter((item) => item.id !== boardId);
-  });
+  }, { undoLabel: "Board deletion" });
 }
 
 async function restoreTrashItem(index) {
@@ -288,6 +347,10 @@ async function restoreTrashItem(index) {
           column: pageBoards.length % TABORA_BOARD_COLUMNS,
           columnOrder: pageBoards.filter((entry) => entry.column === pageBoards.length % TABORA_BOARD_COLUMNS).length,
           starred: false,
+          pinned: false,
+          color: "green",
+          icon: "folder",
+          size: "medium",
           createdAt: Date.now(),
           links: []
         };
@@ -327,6 +390,8 @@ async function addLink(boardId, values) {
   return updateTaboraState((state) => {
     const board = state.boards.find((item) => item.id === boardId);
     if (!board) return null;
+    const duplicate = findDuplicateLink(state, url);
+    if (duplicate) return { duplicate: true, ...duplicate };
     const link = {
       id: makeId("link"),
       title: cleanName(values.title, getDomain(url)),
@@ -346,6 +411,8 @@ async function updateLink(boardId, linkId, values) {
     const link = board?.links.find((item) => item.id === linkId);
     if (!link) return;
     const url = normalizeUrl(values.url);
+    const duplicate = url ? findDuplicateLink(state, url, linkId) : null;
+    if (duplicate) return { duplicate: true, ...duplicate };
     if (url) link.url = url;
     link.title = cleanName(values.title, link.title);
     link.note = String(values.note || "").trim().slice(0, 2000);
@@ -369,6 +436,46 @@ async function deleteLink(boardId, linkId) {
     });
     board.links = board.links.filter((item) => item.id !== linkId);
     board.links.forEach((item, index) => { item.order = index; });
+  }, { undoLabel: "Bookmark deletion" });
+}
+
+function findDuplicateLink(state, value, excludeLinkId = "") {
+  const url = normalizeUrl(value);
+  if (!url) return null;
+  for (const board of state.boards) {
+    const link = board.links.find((item) => item.id !== excludeLinkId && normalizeUrl(item.url) === url);
+    if (!link) continue;
+    const page = state.pages.find((item) => item.id === board.pageId);
+    return { link, board, page };
+  }
+  return null;
+}
+
+async function recordLinkOpened(boardId, linkId) {
+  return updateTaboraState((state) => {
+    const board = state.boards.find((item) => item.id === boardId);
+    const link = board?.links.find((item) => item.id === linkId);
+    if (!board || !link) return;
+    const page = state.pages.find((item) => item.id === board.pageId);
+    state.recentlyOpened = state.recentlyOpened.filter((item) => item.linkId !== linkId);
+    state.recentlyOpened.unshift({
+      linkId,
+      boardId,
+      pageId: board.pageId,
+      title: link.title,
+      url: link.url,
+      boardName: board.name,
+      pageName: page?.name || "Home",
+      openedAt: Date.now()
+    });
+    state.recentlyOpened = state.recentlyOpened.slice(0, 50);
+  });
+}
+
+async function setLinkHealth(boardId, linkId, health) {
+  return updateTaboraState((state) => {
+    const link = state.boards.find((board) => board.id === boardId)?.links.find((item) => item.id === linkId);
+    if (link) link.health = health;
   });
 }
 
@@ -389,7 +496,7 @@ async function reorderBoard(boardId, beforeBoardId) {
       .filter((item) => item.pageId === board.pageId && item.column === sourceColumn && item.id !== board.id)
       .sort((a, b) => (a.columnOrder || 0) - (b.columnOrder || 0))
       .forEach((item, index) => { item.columnOrder = index; });
-  });
+  }, { undoLabel: "Board reorder" });
 }
 
 async function moveBoardToColumn(boardId, column) {
@@ -405,7 +512,7 @@ async function moveBoardToColumn(boardId, column) {
       .filter((item) => item.pageId === board.pageId && item.column === sourceColumn && item.id !== board.id)
       .sort((a, b) => (a.columnOrder || 0) - (b.columnOrder || 0))
       .forEach((item, index) => { item.columnOrder = index; });
-  });
+  }, { undoLabel: "Board move" });
 }
 
 async function moveLink(linkId, fromBoardId, toBoardId, beforeLinkId = null) {
@@ -420,7 +527,7 @@ async function moveLink(linkId, fromBoardId, toBoardId, beforeLinkId = null) {
     targetLinks.splice(targetIndex < 0 ? targetLinks.length : targetIndex, 0, link);
     source.links.forEach((item, index) => { item.order = index; });
     target.links = targetLinks.map((item, index) => ({ ...item, order: index }));
-  });
+  }, { undoLabel: "Bookmark move" });
 }
 
 async function setSetting(key, value) {
@@ -432,15 +539,25 @@ async function setSetting(key, value) {
 async function saveCurrentWindowAsBoard(pageId, name) {
   const tabs = await chrome.tabs.query({ currentWindow: true });
   const savableTabs = tabs.filter((tab) => normalizeUrl(tab.url));
-  const links = savableTabs
-    .map((tab) => ({ title: tab.title, url: tab.url, favIconUrl: tab.favIconUrl || "" }));
-  if (!links.length) return null;
-  const board = await addBoard(pageId, name || "Current Window", links);
   const state = await getTaboraState();
-  if (state.settings.closeTabsAfterSaveAll && savableTabs.length) {
-    await chrome.tabs.remove(savableTabs.map((tab) => tab.id));
+  const existingUrls = new Set(state.boards.flatMap((board) => board.links.map((link) => normalizeUrl(link.url))));
+  const seenUrls = new Set(existingUrls);
+  const uniqueTabs = savableTabs.filter((tab) => {
+    const url = normalizeUrl(tab.url);
+    if (seenUrls.has(url)) return false;
+    seenUrls.add(url);
+    return true;
+  });
+  const links = uniqueTabs
+    .map((tab) => ({ title: tab.title, url: tab.url, favIconUrl: tab.favIconUrl || "" }));
+  const duplicateCount = savableTabs.length - uniqueTabs.length;
+  if (!links.length) return { board: null, duplicateCount };
+  const board = await addBoard(pageId, name || "Current Window", links);
+  const latestState = await getTaboraState();
+  if (latestState.settings.closeTabsAfterSaveAll && uniqueTabs.length) {
+    await chrome.tabs.remove(uniqueTabs.map((tab) => tab.id));
   }
-  return board;
+  return { board: board.result, duplicateCount };
 }
 
 async function openLinks(links, incognito = false) {

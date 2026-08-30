@@ -33,6 +33,7 @@
       <button id="organizeTool" class="rail-button" title="Organize" aria-label="Organize"><svg class="rail-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="6" height="6" rx="1"></rect><rect x="14" y="3" width="6" height="6" rx="1"></rect><rect x="3" y="14" width="6" height="6" rx="1"></rect><path d="m13.5 17 2.2 2.2 4.8-5"></path></svg></button>
       <button id="trashTool" class="rail-button" title="Trash" aria-label="Trash"><svg class="rail-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16"></path><path d="M9 7V4h6v3"></path><path d="m6 7 1 14h10l1-14"></path><path d="M10 11v6M14 11v6"></path></svg></button>
       <button id="privacyTool" class="rail-button" title="Privacy mode" aria-label="Privacy mode"><svg class="rail-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"></path><circle cx="12" cy="12" r="2.7"></circle></svg></button>
+      <button id="featureTool" class="rail-button" title="Workspace tools" aria-label="Workspace tools"><svg class="rail-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 14 8.5 19.5 10.5 14 12.5 12 18 10 12.5 4.5 10.5 10 8.5 12 3Z"></path><path d="m18.5 3 .7 2 .8.3-2 .7-.7 2-.8-2-2-.7 2-.8.7-2Z"></path></svg></button>
       <button id="moreToolsTool" class="rail-button more-tools-button" title="More tools" aria-label="More tools" hidden><svg class="rail-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg></button>
       <button id="settingsTool" class="rail-button accent-rail" title="Settings" aria-label="Settings"><svg class="rail-icon rail-icon-settings" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2"></circle><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M18.7 5.3l-2.1 2.1M7.4 16.6l-2.1 2.1"></path><circle cx="12" cy="12" r="7"></circle></svg></button>
     </aside>
@@ -56,6 +57,12 @@
         <header class="dialog-header"><div><span class="eyebrow">New collection</span><h2 id="boardDialogTitle">Add board</h2></div><button class="dialog-close" type="button" data-close-dialog="boardDialog" aria-label="Close">&times;</button></header>
         <label for="boardName">Board name</label>
         <input id="boardName" class="dark-input" placeholder="AI Tools" maxlength="60" autocomplete="off">
+        <div class="board-customize-grid">
+          <label>Icon<select id="boardIcon" class="dark-input"><option value="folder">Folder</option><option value="briefcase">Work</option><option value="book">Book</option><option value="star">Star</option><option value="code">Code</option><option value="spark">Spark</option></select></label>
+          <label>Color<select id="boardColor" class="dark-input"><option value="green">Green</option><option value="blue">Blue</option><option value="amber">Amber</option><option value="rose">Rose</option><option value="violet">Violet</option><option value="slate">Slate</option></select></label>
+          <label>Size<select id="boardSize" class="dark-input"><option value="small">Small</option><option value="medium">Medium</option><option value="large">Large</option></select></label>
+          <label class="board-pin-control"><input id="boardPinned" type="checkbox"><span>Pin board</span></label>
+        </div>
         <input id="editingBoardId" type="hidden">
         <footer class="dialog-footer"><button class="secondary-button" type="button" data-close-dialog="boardDialog">Cancel</button><button class="accent-button" type="submit">Save board</button></footer>
       </form>
@@ -179,6 +186,56 @@
       </div>
     </dialog>
 
+    <dialog id="featureDialog" class="settings-dialog feature-dialog">
+      <div class="feature-layout">
+        <aside class="feature-sidebar">
+          <h2>Workspace Tools</h2>
+          <nav aria-label="Workspace tools sections">
+            <button class="feature-nav-button active" type="button" data-feature-view="overview">Overview</button>
+            <button class="feature-nav-button" type="button" data-feature-view="activity">Activity</button>
+            <button class="feature-nav-button" type="button" data-feature-view="organize">Organize</button>
+            <button class="feature-nav-button" type="button" data-feature-view="spaces">Spaces</button>
+            <button class="feature-nav-button" type="button" data-feature-view="knowledge">Knowledge</button>
+            <button class="feature-nav-button" type="button" data-feature-view="vaults">Vaults</button>
+            <button class="feature-nav-button" type="button" data-feature-view="rooms">Rooms</button>
+          </nav>
+        </aside>
+        <div class="feature-content">
+          <button class="dialog-close settings-close" type="button" data-close-dialog="featureDialog" aria-label="Close">&times;</button>
+          <section class="feature-view active" data-feature-section="overview">
+            <h2>Overview</h2>
+            <div class="feature-action-grid">
+              <button id="featureSaveSession" class="feature-action" type="button"><strong>Save Current Session</strong><span>Current window</span></button>
+              <button id="featureUndo" class="feature-action" type="button"><strong>Undo Last Change</strong><span id="featureUndoLabel">Nothing to undo</span></button>
+            </div>
+          </section>
+          <section class="feature-view" data-feature-section="activity"><h2>Recently Opened</h2><div id="recentActivity" class="feature-list"></div></section>
+          <section class="feature-view" data-feature-section="organize">
+            <h2>Organize</h2>
+            <div class="feature-action-grid"><button id="checkLinks" class="feature-action" type="button"><strong>Check Links</strong><span>Health and redirects</span></button><button id="smartOrganize" class="feature-action" type="button"><strong>Smart Organization</strong><span>Current page</span></button></div>
+            <div id="organizeResults" class="feature-list"></div>
+          </section>
+          <section class="feature-view" data-feature-section="spaces">
+            <h2>Mood Spaces</h2>
+            <form id="moodForm" class="feature-inline-form"><input id="moodName" class="dark-input" maxlength="40" placeholder="Deep Work" required><button class="accent-button" type="submit">Save Current Space</button></form>
+            <div id="moodList" class="feature-list"></div>
+          </section>
+          <section class="feature-view" data-feature-section="knowledge"><h2>Knowledge Graph</h2><div id="knowledgeGraph" class="knowledge-graph"></div></section>
+          <section class="feature-view" data-feature-section="vaults">
+            <h2>Private Vaults</h2>
+            <form id="vaultForm" class="feature-form"><select id="vaultPage" class="dark-input"></select><input id="vaultPassword" class="dark-input" type="password" minlength="8" placeholder="Password (8+ characters)" required><button class="accent-button" type="submit">Lock Page</button></form>
+            <div id="vaultList" class="feature-list"></div>
+          </section>
+          <section class="feature-view" data-feature-section="rooms">
+            <h2>Anonymous Rooms</h2>
+            <div class="feature-action-grid"><button id="createRoom" class="feature-action" type="button"><strong>Create Room Package</strong><span>Current page, expires in 24 hours</span></button></div>
+            <label class="feature-room-code">Room package<textarea id="roomCode" class="dark-input" placeholder="Paste a Tabora room package"></textarea></label>
+            <button id="joinRoom" class="accent-button" type="button">Join Room</button>
+          </section>
+        </div>
+      </div>
+    </dialog>
+
     <div id="onboardingCard" class="onboarding-card" hidden>
       <strong>Step 1 of 3: Create your first board</strong>
       <p>Click Add Board, type a name, then save it.</p>
@@ -199,5 +256,6 @@
 
     <script src="shared.js"></script>
     <script src="dashboard.js"></script>
+    <script src="features.js"></script>
   </body>
 </html>

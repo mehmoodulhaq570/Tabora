@@ -3,8 +3,16 @@ const capturePage = document.querySelector("#capturePage");
 const targetBoard = document.querySelector("#targetBoard");
 const popupSearch = document.querySelector("#popupSearch");
 const recentBoards = document.querySelector("#recentBoards");
+const popupStatus = document.querySelector("#popupStatus");
 
 let popupState = createDefaultState();
+
+function showPopupStatus(message, warning = false) {
+  popupStatus.textContent = message;
+  popupStatus.classList.toggle("warning", warning);
+  popupStatus.hidden = false;
+  setTimeout(() => { popupStatus.hidden = true; }, 3200);
+}
 
 async function initPopup() {
   popupState = await getTaboraState();
@@ -60,15 +68,21 @@ function renderRecentBoards() {
 
 document.querySelector("#saveWindow").addEventListener("click", async () => {
   const saved = await saveCurrentWindowAsBoard(capturePage.value, captureName.value || "Current Window");
-  if (!saved) return;
+  if (!saved?.board) { showPopupStatus(saved?.duplicateCount ? "All open tabs are already saved" : "No tabs are available to save", true); return; }
   captureName.value = "";
+  showPopupStatus(saved.duplicateCount ? `Session saved · ${saved.duplicateCount} duplicates skipped` : "Session saved");
   await initPopup();
 });
 
 document.querySelector("#addCurrentTab").addEventListener("click", async () => {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (!tab || !normalizeUrl(tab.url) || !targetBoard.value) return;
-  await addLink(targetBoard.value, { title: tab.title, url: tab.url, favIconUrl: tab.favIconUrl || "" });
+  const added = await addLink(targetBoard.value, { title: tab.title, url: tab.url, favIconUrl: tab.favIconUrl || "" });
+  if (added.result?.duplicate) {
+    showPopupStatus(`Already saved in ${added.result.page?.name || "Home"} / ${added.result.board.name}`, true);
+    return;
+  }
+  showPopupStatus("Tab saved");
   await initPopup();
 });
 
