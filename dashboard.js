@@ -795,12 +795,40 @@ document.querySelectorAll("dialog").forEach((dialog) => {
   dialog.addEventListener("click", (event) => { if (event.target === dialog) dialog.close(); });
 });
 
-document.querySelector("#searchTool").addEventListener("click", () => {
-  nodes.searchPanel.hidden = !nodes.searchPanel.hidden;
-  if (!nodes.searchPanel.hidden) nodes.globalSearch.focus();
+const searchTool = document.querySelector("#searchTool");
+const clearSearchButton = document.querySelector("#clearSearch");
+
+function syncSearchState() {
+  const isOpen = !nodes.searchPanel.hidden;
+  document.body.classList.toggle("search-active", isOpen);
+  searchTool.classList.toggle("active", isOpen);
+  searchTool.setAttribute("aria-expanded", String(isOpen));
+  clearSearchButton.hidden = !nodes.globalSearch.value;
+}
+
+function openSearch() {
+  closeAppearancePanel();
+  nodes.contextMenu.hidden = true;
+  nodes.searchPanel.hidden = false;
+  syncSearchState();
+  nodes.globalSearch.focus({ preventScroll: true });
+  requestAnimationFrame(() => nodes.globalSearch.focus({ preventScroll: true }));
+}
+
+function closeSearch() {
+  if (nodes.searchPanel.hidden) return;
+  nodes.searchPanel.hidden = true;
+  nodes.globalSearch.value = "";
+  syncSearchState();
+  renderBoards();
+}
+
+searchTool.addEventListener("click", () => {
+  if (nodes.searchPanel.hidden) openSearch();
+  else closeSearch();
 });
-nodes.globalSearch.addEventListener("input", renderBoards);
-document.querySelector("#clearSearch").addEventListener("click", () => { nodes.globalSearch.value = ""; renderBoards(); nodes.globalSearch.focus(); });
+nodes.globalSearch.addEventListener("input", () => { syncSearchState(); renderBoards(); });
+clearSearchButton.addEventListener("click", () => { nodes.globalSearch.value = ""; syncSearchState(); renderBoards(); nodes.globalSearch.focus(); });
 
 document.querySelector("#incognitoTool").addEventListener("click", async () => {
   await setSetting("incognitoMode", !appState.settings.incognitoMode);
@@ -1582,7 +1610,11 @@ document.querySelector("#skipOnboarding").addEventListener("click", async () => 
 document.addEventListener("click", (event) => {
   if (!event.target.closest("#contextMenu") && !event.target.closest("[data-board-menu]") && !event.target.closest("[data-page-options]")) nodes.contextMenu.hidden = true;
   if (!event.target.closest("#appearancePanel") && !event.target.closest("#wallpaperTool")) closeAppearancePanel();
+  if (!event.target.closest("#searchPanel") && !event.target.closest("#searchTool")) closeSearch();
 });
-document.addEventListener("keydown", (event) => { if (event.key === "/" && !event.target.matches("input, textarea")) { event.preventDefault(); nodes.searchPanel.hidden = false; nodes.globalSearch.focus(); } });
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && !nodes.searchPanel.hidden) { event.preventDefault(); closeSearch(); return; }
+  if (event.key === "/" && !event.target.matches("input, textarea")) { event.preventDefault(); openSearch(); }
+});
 chrome.storage.onChanged.addListener((changes) => { if (changes[TABORA_STORAGE_KEY]) init(); });
 init();

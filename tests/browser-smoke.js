@@ -3,6 +3,7 @@ const fs = require("node:fs");
 
 const port = Number(process.env.TABORA_DEBUG_PORT || 9333);
 const screenshotPath = process.env.TABORA_SCREENSHOT || "";
+const searchScreenshotPath = process.env.TABORA_SEARCH_SCREENSHOT || "";
 
 class CdpClient {
   constructor(url) {
@@ -74,6 +75,40 @@ async function waitForTargets() {
   assert.match(page.url, /^chrome-extension:\/\//);
   assert.equal(page.tool, true);
   assert.equal(page.horizontalOverflow, false);
+
+  const search = await client.evaluate(`(async () => {
+    const tool = document.querySelector("#searchTool");
+    tool.click();
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    const panel = document.querySelector("#searchPanel");
+    const rect = panel.getBoundingClientRect();
+    const opened = {
+      visible: !panel.hidden,
+      active: document.body.classList.contains("search-active"),
+      expanded: tool.getAttribute("aria-expanded"),
+      focused: document.activeElement === document.querySelector("#globalSearch"),
+      width: Math.round(rect.width),
+      height: Math.round(rect.height)
+    };
+    document.querySelector(".workspace-main").click();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    return { ...opened, closedOutside: panel.hidden, inactive: !document.body.classList.contains("search-active") };
+  })()`);
+  assert.equal(search.visible, true);
+  assert.equal(search.active, true);
+  assert.equal(search.expanded, "true");
+  assert.equal(search.focused, true);
+  assert.ok(search.width > 900 && search.height >= 70);
+  assert.equal(search.closedOutside, true);
+  assert.equal(search.inactive, true);
+
+  if (searchScreenshotPath) {
+    await client.evaluate(`document.querySelector("#searchTool").click()`);
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    const screenshot = await client.send("Page.captureScreenshot", { format: "png", captureBeyondViewport: false });
+    fs.writeFileSync(searchScreenshotPath, Buffer.from(screenshot.data, "base64"));
+    await client.evaluate(`document.querySelector("#searchTool").click()`);
+  }
 
   const themes = await client.evaluate(`(async () => {
     document.querySelector("#wallpaperTool").click();

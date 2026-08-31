@@ -15,10 +15,10 @@
         <button id="addPageButton" class="square-button" title="Add New Page" aria-label="Add New Page"><span class="icon-plus"></span></button>
       </header>
 
-      <div id="searchPanel" class="floating-search" hidden>
+      <div id="searchPanel" class="floating-search" role="search" hidden>
         <span class="icon-search"></span>
-        <input id="globalSearch" type="search" placeholder="Search boards, links, or URLs" autocomplete="off">
-        <button id="clearSearch" class="plain-icon-button" aria-label="Clear search">&times;</button>
+        <input id="globalSearch" type="search" placeholder="Search here" autocomplete="off" aria-label="Search boards, links, or URLs">
+        <button id="clearSearch" class="plain-icon-button" aria-label="Clear search" hidden>&times;</button>
       </div>
 
       <main class="workspace-main">
@@ -27,7 +27,7 @@
     </div>
 
     <aside class="tool-rail" aria-label="Tabora tools">
-      <button id="searchTool" class="rail-button" title="Search" aria-label="Search"><svg class="rail-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7.5"></circle><path d="m16.5 16.5 4 4"></path></svg></button>
+      <button id="searchTool" class="rail-button" title="Search" aria-label="Search" aria-expanded="false" aria-controls="searchPanel"><svg class="rail-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7.5"></circle><path d="m16.5 16.5 4 4"></path></svg></button>
       <button id="importTool" class="rail-button" title="Import" aria-label="Import"><svg class="rail-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12"></path><path d="m7.5 10.5 4.5 4.5 4.5-4.5"></path><path d="M4 16.5V20h16v-3.5"></path></svg></button>
       <button id="incognitoTool" class="rail-button" title="Open links privately" aria-label="Open links privately"><svg class="rail-icon rail-icon-incognito" viewBox="0 0 24 24" aria-hidden="true"><path d="M6.2 10 8 4.5h8l1.8 5.5"></path><path d="M4 10h16"></path><circle cx="7.5" cy="16" r="3.2"></circle><circle cx="16.5" cy="16" r="3.2"></circle><path d="M10.7 15.3c.8-.7 1.8-.7 2.6 0"></path></svg></button>
       <button id="organizeTool" class="rail-button" title="Organize" aria-label="Organize"><svg class="rail-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="6" height="6" rx="1"></rect><rect x="14" y="3" width="6" height="6" rx="1"></rect><rect x="3" y="14" width="6" height="6" rx="1"></rect><path d="m13.5 17 2.2 2.2 4.8-5"></path></svg></button>
