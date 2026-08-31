@@ -33,7 +33,6 @@ function createDefaultState() {
       quickSaveDestination: "current-page",
       language: "en",
       activeMoodId: "",
-      onboardingStep: 0,
       onboardingComplete: false
     }
   };
@@ -256,10 +255,11 @@ async function addBoard(pageId, name, links = [], placement = null) {
   return updateTaboraState((state) => {
     const page = state.pages.find((item) => item.id === pageId) || state.pages[0];
     const pageBoards = ordered(state.boards.filter((item) => item.pageId === page.id));
-    const requestedColumn = typeof placement === "object" && placement !== null ? placement.column : pageBoards.length % TABORA_BOARD_COLUMNS;
+    const isFirstBoard = pageBoards.length === 0;
+    const requestedColumn = isFirstBoard ? 0 : typeof placement === "object" && placement !== null ? placement.column : pageBoards.length % TABORA_BOARD_COLUMNS;
     const column = Math.max(0, Math.min(TABORA_BOARD_COLUMNS - 1, Number(requestedColumn) || 0));
     const columnBoards = pageBoards.filter((item) => item.column === column).sort((a, b) => (a.columnOrder || 0) - (b.columnOrder || 0));
-    const requestedOrder = typeof placement === "object" && placement !== null ? placement.order : columnBoards.length;
+    const requestedOrder = isFirstBoard ? 0 : typeof placement === "object" && placement !== null ? placement.order : columnBoards.length;
     const columnOrder = Math.max(0, Math.min(Number(requestedOrder) || 0, columnBoards.length));
     for (const item of columnBoards) {
       if ((item.columnOrder || 0) >= columnOrder) item.columnOrder += 1;

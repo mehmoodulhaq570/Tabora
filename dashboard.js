@@ -38,7 +38,6 @@ const nodes = {
   onboardingProgress: document.querySelector("#onboardingProgress"),
   onboardingTitle: document.querySelector("#onboardingTitle"),
   onboardingDescription: document.querySelector("#onboardingDescription"),
-  onboardingBack: document.querySelector("#onboardingBack"),
   onboardingAction: document.querySelector("#onboardingAction"),
   onboardingNext: document.querySelector("#onboardingNext"),
   toast: document.querySelector("#toast")
@@ -67,34 +66,34 @@ let pendingRefreshAppearance = false;
 let pendingRefreshMessage = "";
 let pendingRefreshWaiters = [];
 const boardCardCache = new Map();
-let highlightedTourTarget = null;
-let onboardingHasOpened = false;
-let onboardingPositionFrame = null;
 
 const ONBOARDING_STEPS = [
   {
-    title: "Create your first board",
-    description: "Boards keep related links together. Start by creating one for a project, topic, or routine.",
-    target: () => nodes.boardGrid.querySelector("[data-add-board]"),
+    progress: "Getting started",
+    title: "Welcome to Tabora",
+    description: "Create a board to collect links for a project, topic, or routine.",
     actionLabel: "Create board",
-    action: () => nodes.boardGrid.querySelector("[data-add-board]")?.click(),
-    nextLabel: "Continue"
+    action: () => openBoardDialog(),
+    dismissLabel: "Skip for now"
   },
   {
-    title: "Save a useful link",
-    description: "Use the link button on a board to save a website, note, or resource where you can find it again.",
-    target: () => nodes.boardGrid.querySelector("[data-add-link]"),
+    progress: "One more step",
+    title: "Add a useful link",
+    description: "Save a website, note, or resource to the board you just created.",
     actionLabel: "Add link",
-    action: () => nodes.boardGrid.querySelector("[data-add-link]")?.click(),
-    nextLabel: "Continue"
+    action: () => {
+      const board = activeBoards()[0];
+      if (board) openLinkDialog(board.id);
+    },
+    dismissLabel: "Skip for now"
   },
   {
-    title: "Find anything quickly",
-    description: "Search looks through board names, saved links, addresses, and notes from anywhere in your workspace.",
-    target: () => searchTool,
+    progress: "All set",
+    title: "Your workspace is ready",
+    description: "Search, organize, and customize Tabora whenever you need it.",
     actionLabel: "Open search",
     action: () => openSearch(),
-    nextLabel: "Finish"
+    dismissLabel: "Done"
   }
 ];
 
@@ -359,113 +358,24 @@ function renderOrganizeToolbar() {
 
 function renderOnboarding() {
   if (appState.settings.onboardingComplete) {
-    hideOnboardingCard();
+    nodes.onboardingCard.hidden = true;
     return;
   }
 
-  let stepIndex = Math.max(0, Math.min(ONBOARDING_STEPS.length - 1, Number(appState.settings.onboardingStep) || 0));
-  if (stepIndex === 0 && appState.boards.length) {
-    stepIndex = 1;
-    void setOnboardingStep(stepIndex);
-  } else if (stepIndex === 1 && !appState.boards.length) {
-    stepIndex = 0;
-    void setOnboardingStep(stepIndex);
-  }
+  const boards = activeBoards();
+  const stepIndex = boards.length === 0 ? 0 : boards.some((board) => board.links.length > 0) ? 2 : 1;
   const step = ONBOARDING_STEPS[stepIndex];
-  const target = step.target();
-  const needsBoard = stepIndex === 0 && appState.boards.length === 0;
 
-  clearOnboardingTarget();
-  if (target) {
-    target.classList.add("tour-target");
-    highlightedTourTarget = target;
-  }
-
-  nodes.onboardingProgress.textContent = `Step ${stepIndex + 1} of ${ONBOARDING_STEPS.length}`;
+  nodes.onboardingProgress.textContent = step.progress;
   nodes.onboardingTitle.textContent = step.title;
   nodes.onboardingDescription.textContent = step.description;
-  nodes.onboardingBack.hidden = stepIndex === 0;
-  nodes.onboardingAction.hidden = !target;
   nodes.onboardingAction.textContent = step.actionLabel;
-  nodes.onboardingNext.textContent = step.nextLabel;
-  nodes.onboardingNext.disabled = needsBoard;
-  nodes.onboardingNext.title = needsBoard ? "Create a board to continue" : "";
-  document.querySelectorAll(".onboarding-steps i").forEach((item, index) => item.classList.toggle("active", index <= stepIndex));
-
-  nodes.onboardingCard.classList.add("is-open");
-  if (typeof nodes.onboardingCard.showPopover === "function" && !nodes.onboardingCard.matches(":popover-open")) {
-    nodes.onboardingCard.showPopover();
-  }
-  requestAnimationFrame(() => {
-    positionOnboardingCard(target);
-    if (!onboardingHasOpened) {
-      onboardingHasOpened = true;
-      (nodes.onboardingNext.disabled ? nodes.onboardingAction : nodes.onboardingNext).focus({ preventScroll: true });
-    }
-  });
-}
-
-function clearOnboardingTarget() {
-  highlightedTourTarget?.classList.remove("tour-target");
-  highlightedTourTarget = null;
-}
-
-function hideOnboardingCard() {
-  clearOnboardingTarget();
-  if (onboardingPositionFrame) cancelAnimationFrame(onboardingPositionFrame);
-  onboardingPositionFrame = null;
-  if (typeof nodes.onboardingCard.hidePopover === "function" && nodes.onboardingCard.matches(":popover-open")) {
-    nodes.onboardingCard.hidePopover();
-  }
-  nodes.onboardingCard.classList.remove("is-open");
-  nodes.onboardingCard.style.left = "";
-  nodes.onboardingCard.style.top = "";
-}
-
-function positionOnboardingCard(target = highlightedTourTarget) {
-  if (!nodes.onboardingCard.classList.contains("is-open")) return;
-  const card = nodes.onboardingCard;
-  const padding = 16;
-  const cardRect = card.getBoundingClientRect();
-  const width = cardRect.width;
-  const height = cardRect.height;
-  let left = Math.max(padding, (window.innerWidth - width) / 2);
-  let top = Math.max(padding, window.innerHeight - height - 28);
-
-  if (target?.isConnected) {
-    const targetRect = target.getBoundingClientRect();
-    left = targetRect.right + 16;
-    if (left + width > window.innerWidth - padding) left = targetRect.left - width - 16;
-    if (left < padding || left + width > window.innerWidth - padding) {
-      left = Math.max(padding, Math.min(window.innerWidth - width - padding, targetRect.left));
-      top = targetRect.bottom + 16;
-    } else {
-      top = targetRect.top;
-    }
-    top = Math.max(padding, Math.min(window.innerHeight - height - padding, top));
-  }
-
-  card.style.left = `${Math.round(left)}px`;
-  card.style.top = `${Math.round(top)}px`;
-}
-
-function scheduleOnboardingPosition() {
-  if (!nodes.onboardingCard.classList.contains("is-open")) return;
-  if (onboardingPositionFrame) cancelAnimationFrame(onboardingPositionFrame);
-  onboardingPositionFrame = requestAnimationFrame(() => {
-    onboardingPositionFrame = null;
-    positionOnboardingCard();
-  });
-}
-
-async function setOnboardingStep(stepIndex) {
-  await setSetting("onboardingStep", Math.max(0, Math.min(ONBOARDING_STEPS.length - 1, stepIndex)));
-  await refresh();
+  nodes.onboardingNext.textContent = step.dismissLabel;
+  nodes.onboardingCard.hidden = false;
 }
 
 async function completeOnboarding() {
   await setSetting("onboardingComplete", true);
-  await setSetting("onboardingStep", ONBOARDING_STEPS.length - 1);
   await refresh();
 }
 
@@ -1947,27 +1857,12 @@ async function applyAppearance() {
   appliedAppearanceKey = appearanceKey;
 }
 
-document.querySelector("#skipOnboarding").addEventListener("click", () => { void completeOnboarding(); });
-nodes.onboardingBack.addEventListener("click", () => {
-  void setOnboardingStep((Number(appState.settings.onboardingStep) || 0) - 1);
-});
 nodes.onboardingAction.addEventListener("click", () => {
-  const stepIndex = Math.max(0, Math.min(ONBOARDING_STEPS.length - 1, Number(appState.settings.onboardingStep) || 0));
+  const boards = activeBoards();
+  const stepIndex = boards.length === 0 ? 0 : boards.some((board) => board.links.length > 0) ? 2 : 1;
   ONBOARDING_STEPS[stepIndex].action();
 });
-nodes.onboardingNext.addEventListener("click", () => {
-  const stepIndex = Math.max(0, Math.min(ONBOARDING_STEPS.length - 1, Number(appState.settings.onboardingStep) || 0));
-  if (stepIndex === ONBOARDING_STEPS.length - 1) {
-    void completeOnboarding();
-    return;
-  }
-  void setOnboardingStep(stepIndex + 1);
-});
-nodes.onboardingCard.addEventListener("toggle", (event) => {
-  if (event.newState === "closed") nodes.onboardingCard.classList.remove("is-open");
-});
-window.addEventListener("resize", scheduleOnboardingPosition);
-window.addEventListener("scroll", scheduleOnboardingPosition, { passive: true });
+nodes.onboardingNext.addEventListener("click", () => { void completeOnboarding(); });
 document.addEventListener("click", (event) => {
   if (!event.target.closest("#contextMenu") && !event.target.closest("[data-board-menu]") && !event.target.closest("[data-page-options]")) hideContextMenu();
   if (!event.target.closest("#appearancePanel") && !event.target.closest("#wallpaperTool")) closeAppearancePanel();
@@ -1976,7 +1871,6 @@ document.addEventListener("click", (event) => {
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape" && !nodes.contextMenu.hidden) { event.preventDefault(); hideContextMenu({ restoreFocus: true }); return; }
   if (event.key === "Escape" && !nodes.searchPanel.hidden) { event.preventDefault(); closeSearch(); return; }
-  if (event.key === "Escape" && nodes.onboardingCard.classList.contains("is-open")) { event.preventDefault(); void completeOnboarding(); return; }
   if (event.key === "/" && !event.target.matches("input, textarea")) { event.preventDefault(); openSearch(); }
 });
 chrome.storage.onChanged.addListener((changes) => {

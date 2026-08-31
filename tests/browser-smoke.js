@@ -89,35 +89,32 @@ async function waitForTargets() {
     await updateTaboraState((state) => {
       state.boards = [];
       state.settings.onboardingComplete = false;
-      state.settings.onboardingStep = 0;
     });
     await refresh();
     await new Promise((resolve) => setTimeout(resolve, 80));
     const card = document.querySelector("#onboardingCard");
     const initial = {
-      open: card.matches(":popover-open"),
-      role: card.getAttribute("role"),
+      visible: !card.hidden,
       title: document.querySelector("#onboardingTitle").textContent,
-      disabled: document.querySelector("#onboardingNext").disabled
+      action: document.querySelector("#onboardingAction").textContent
     };
     document.querySelector("#onboardingAction").click();
-    const editorOpened = Boolean(document.querySelector(".inline-board-form"));
-    document.querySelector(".inline-board-form")?.remove();
+    const editorOpened = document.querySelector("#boardDialog").open;
+    document.querySelector("#boardDialog").close();
     await addBoard("home", "Tour board");
     await refresh();
     await new Promise((resolve) => setTimeout(resolve, 100));
     const afterBoard = document.querySelector("#onboardingTitle").textContent;
-    document.querySelector("#skipOnboarding").click();
+    document.querySelector("#onboardingNext").click();
     await new Promise((resolve) => setTimeout(resolve, 80));
     const state = await getTaboraState();
-    return { initial, editorOpened, afterBoard, complete: state.settings.onboardingComplete, closed: !card.matches(":popover-open") };
+    return { initial, editorOpened, afterBoard, complete: state.settings.onboardingComplete, closed: card.hidden };
   })()`);
-  assert.equal(tour.initial.open, true);
-  assert.equal(tour.initial.role, "dialog");
-  assert.equal(tour.initial.title, "Create your first board");
-  assert.equal(tour.initial.disabled, true);
+  assert.equal(tour.initial.visible, true);
+  assert.equal(tour.initial.title, "Welcome to Tabora");
+  assert.equal(tour.initial.action, "Create board");
   assert.equal(tour.editorOpened, true);
-  assert.equal(tour.afterBoard, "Save a useful link");
+  assert.equal(tour.afterBoard, "Add a useful link");
   assert.equal(tour.complete, true);
   assert.equal(tour.closed, true);
 

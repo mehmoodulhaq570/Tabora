@@ -26,11 +26,13 @@ vm.runInContext(source, context);
   const initial = await api.getTaboraState();
   assert.equal(initial.schemaVersion, 4);
   assert.equal(initial.recentlyOpened.length, 0);
-  assert.equal(initial.settings.onboardingStep, 0);
+  assert.equal(initial.settings.onboardingComplete, false);
 
-  const created = await api.addBoard("home", "Research");
+  const created = await api.addBoard("home", "Research", [], { column: 3, order: 8 });
   const boardId = created.result.id;
   assert.equal((await api.getTaboraState()).settings.onboardingComplete, false);
+  assert.equal(created.result.column, 0);
+  assert.equal(created.result.columnOrder, 0);
   await api.customizeBoard(boardId, { color: "blue", icon: "book", size: "large", pinned: true });
   let state = await api.getTaboraState();
   assert.equal(state.boards[0].color, "blue");

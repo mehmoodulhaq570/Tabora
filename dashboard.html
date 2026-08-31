@@ -21,6 +21,18 @@
         <button id="clearSearch" class="plain-icon-button" aria-label="Clear search" hidden>&times;</button>
       </div>
 
+      <section id="onboardingCard" class="onboarding-card" aria-labelledby="onboardingTitle" aria-describedby="onboardingDescription">
+        <div class="onboarding-copy">
+          <p id="onboardingProgress" class="onboarding-progress-label">Getting started</p>
+          <h2 id="onboardingTitle">Welcome to Tabora</h2>
+          <p id="onboardingDescription">Create a board to collect links for a project, topic, or routine.</p>
+        </div>
+        <div class="onboarding-actions">
+          <button id="onboardingAction" class="accent-button" type="button">Create board</button>
+          <button id="onboardingNext" class="secondary-button" type="button">Skip for now</button>
+        </div>
+      </section>
+
       <main class="workspace-main">
         <section id="boardGrid" class="board-grid" aria-live="polite"></section>
       </main>
@@ -235,25 +247,6 @@
         </div>
       </div>
     </dialog>
-
-    <aside id="onboardingCard" class="onboarding-card" popover="manual" role="dialog" aria-labelledby="onboardingTitle" aria-describedby="onboardingDescription">
-      <header class="onboarding-header">
-        <div>
-          <p id="onboardingProgress" class="onboarding-progress-label">Getting started</p>
-          <h2 id="onboardingTitle">Create your first board</h2>
-        </div>
-        <button id="skipOnboarding" class="onboarding-close" type="button" aria-label="Skip tour" title="Skip tour">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"></path></svg>
-        </button>
-      </header>
-      <p id="onboardingDescription">Boards keep related links together. Start by creating one for a project, topic, or routine.</p>
-      <div class="onboarding-steps" aria-hidden="true"><i></i><i></i><i></i></div>
-      <div class="onboarding-actions">
-        <button id="onboardingBack" class="secondary-button" type="button" hidden>Back</button>
-        <button id="onboardingAction" class="secondary-button" type="button" hidden></button>
-        <button id="onboardingNext" class="accent-button" type="button">Continue</button>
-      </div>
-    </aside>
 
     <div id="organizeToolbar" class="organize-toolbar" hidden>
       <span class="organize-hint">Click bookmarks to select <i></i> Drag to move</span>
