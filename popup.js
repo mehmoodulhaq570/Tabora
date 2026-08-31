@@ -7,17 +7,18 @@ const popupStatus = document.querySelector("#popupStatus");
 
 let popupState = createDefaultState();
 let popupWallpaperUrl = "";
+let popupAppearanceKey = "";
 
 const POPUP_APPEARANCES = {
-  "digital-ocean": ["forest", "assets/tabora-background.png"],
-  "crimson-realm": ["crimson", "assets/crimson-realm.png"],
+  "digital-ocean": ["forest", "assets/tabora-background.webp"],
+  "crimson-realm": ["crimson", "assets/crimson-realm.webp"],
   "aurora-station": ["aurora", "assets/aurora-station.webp"],
   "moonlit-garden": ["garden", "assets/moonlit-garden.webp"],
   "eclipse-forge": ["eclipse", "assets/eclipse-forge.webp"],
   "abyss-bloom": ["abyss", "assets/abyss-bloom.webp"],
   "neon-monsoon": ["monsoon", "assets/neon-monsoon.webp"],
-  "mist-valley": ["mist", "assets/mist-valley.png"],
-  "amber-voyager": ["amber", "assets/amber-voyager.png"],
+  "mist-valley": ["mist", "assets/mist-valley.webp"],
+  "amber-voyager": ["amber", "assets/amber-voyager.webp"],
   "alpine-clear": ["alpine", "assets/alpine-clear.webp"],
   "coral-coast": ["coast", "assets/coral-coast.webp"],
   "glass-horizon": ["glass", "assets/glass-horizon.webp"],
@@ -41,6 +42,8 @@ async function initPopup() {
 
 async function applyPopupAppearance() {
   const { theme, wallpaper } = popupState.settings;
+  const appearanceKey = `${theme}:${wallpaper}`;
+  if (appearanceKey === popupAppearanceKey) return;
   const appearance = POPUP_APPEARANCES[wallpaper];
   document.body.classList.toggle("light-theme", theme === "light");
   document.body.dataset.palette = appearance?.[0] || `${theme}-default`;
@@ -63,6 +66,7 @@ async function applyPopupAppearance() {
     }
   }
   document.body.style.setProperty("--popup-wallpaper", image ? `url("${image}")` : "none");
+  popupAppearanceKey = appearanceKey;
 }
 
 function renderSelectors() {
@@ -143,5 +147,8 @@ recentBoards.addEventListener("click", async (event) => {
 });
 
 popupSearch.addEventListener("input", renderRecentBoards);
-chrome.storage.onChanged.addListener(initPopup);
-initPopup();
+chrome.storage.onChanged.addListener((changes) => {
+  if (!changes[TABORA_STORAGE_KEY]) return;
+  void initPopup().catch((error) => console.error("Tabora popup could not refresh", error));
+});
+void initPopup().catch((error) => console.error("Tabora popup could not start", error));

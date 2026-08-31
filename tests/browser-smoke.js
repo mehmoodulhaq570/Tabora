@@ -331,7 +331,7 @@ async function waitForTargets() {
   })`);
   assert.equal(darkPopup.palette, "forest");
   assert.equal(darkPopup.light, false);
-  assert.match(darkPopup.wallpaper, /tabora-background\.png/);
+  assert.match(darkPopup.wallpaper, /tabora-background\.webp/);
 
   await client.evaluate(`(async () => {
     await setSetting("theme", "light");

@@ -41,7 +41,7 @@ const nodes = {
 let appState = createDefaultState();
 let draggedItem = null;
 let customWallpaperUrl = "";
-let wallpaperPreviewUrls = [];
+const wallpaperPreviewUrls = new Map();
 let toastTimer = null;
 let pendingImportGroups = [];
 let boardInsertionPlacement = { column: 0, order: 0 };
@@ -50,6 +50,17 @@ let organizeDropTarget = null;
 const selectedOrganizeLinks = new Set();
 let deleteConfirmationResolve = null;
 let contextMenuTrigger = null;
+let appliedAppearanceKey = "";
+let searchRenderTimer = null;
+let organizeDragFrame = null;
+let pendingOrganizePointer = null;
+let refreshTimer = null;
+let refreshChain = Promise.resolve();
+let pendingRefreshState = null;
+let pendingRefreshAppearance = false;
+let pendingRefreshMessage = "";
+let pendingRefreshWaiters = [];
+const boardCardCache = new Map();
 
 const ORGANIZE_TOOL_ICON = '<svg class="rail-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="6" height="6" rx="1"></rect><rect x="14" y="3" width="6" height="6" rx="1"></rect><rect x="3" y="14" width="6" height="6" rx="1"></rect><path d="m13.5 17 2.2 2.2 4.8-5"></path></svg>';
 const ORGANIZE_DONE_ICON = '<svg class="rail-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4.5 4.5L19 7"></path></svg>';
@@ -58,16 +69,16 @@ const PRIVACY_HIDDEN_ICON = '<svg class="rail-icon" viewBox="0 0 24 24" aria-hid
 
 const WALLPAPERS = [
   { id: "none", name: "Default", theme: "dark", palette: "dark-default", image: "" },
-  { id: "digital-ocean", name: "Digital Ocean", theme: "dark", palette: "forest", image: "assets/tabora-background.png" },
-  { id: "crimson-realm", name: "Crimson Realm", theme: "dark", palette: "crimson", image: "assets/crimson-realm.png" },
+  { id: "digital-ocean", name: "Digital Ocean", theme: "dark", palette: "forest", image: "assets/tabora-background.webp", thumbnail: "assets/wallpaper-thumbs/tabora-background.webp" },
+  { id: "crimson-realm", name: "Crimson Realm", theme: "dark", palette: "crimson", image: "assets/crimson-realm.webp", thumbnail: "assets/wallpaper-thumbs/crimson-realm.webp" },
   { id: "aurora-station", name: "Aurora Station", theme: "dark", palette: "aurora", image: "assets/aurora-station.webp" },
   { id: "moonlit-garden", name: "Moonlit Garden", theme: "dark", palette: "garden", image: "assets/moonlit-garden.webp" },
   { id: "eclipse-forge", name: "Eclipse Forge", theme: "dark", palette: "eclipse", image: "assets/eclipse-forge.webp" },
   { id: "abyss-bloom", name: "Abyss Bloom", theme: "dark", palette: "abyss", image: "assets/abyss-bloom.webp" },
   { id: "neon-monsoon", name: "Neon Monsoon", theme: "dark", palette: "monsoon", image: "assets/neon-monsoon.webp" },
   { id: "none", name: "Default", theme: "light", palette: "light-default", image: "" },
-  { id: "mist-valley", name: "Mist Valley", theme: "light", palette: "mist", image: "assets/mist-valley.png" },
-  { id: "amber-voyager", name: "Amber Voyager", theme: "light", palette: "amber", image: "assets/amber-voyager.png" },
+  { id: "mist-valley", name: "Mist Valley", theme: "light", palette: "mist", image: "assets/mist-valley.webp", thumbnail: "assets/wallpaper-thumbs/mist-valley.webp" },
+  { id: "amber-voyager", name: "Amber Voyager", theme: "light", palette: "amber", image: "assets/amber-voyager.webp", thumbnail: "assets/wallpaper-thumbs/amber-voyager.webp" },
   { id: "alpine-clear", name: "Alpine Clear", theme: "light", palette: "alpine", image: "assets/alpine-clear.webp" },
   { id: "coral-coast", name: "Coral Coast", theme: "light", palette: "coast", image: "assets/coral-coast.webp" },
   { id: "glass-horizon", name: "Glass Horizon", theme: "light", palette: "glass", image: "assets/glass-horizon.webp" },
@@ -145,28 +156,48 @@ function renderPages() {
 function renderBoards() {
   const query = nodes.globalSearch.value.trim();
   const boards = activeBoards().filter((board) => boardMatches(board, query));
-  nodes.boardGrid.innerHTML = "";
+  nodes.boardGrid.querySelector(".search-empty")?.remove();
+  nodes.boardGrid.querySelector(".add-board-tile")?.remove();
+  nodes.boardGrid.querySelector(".organize-drop-indicator")?.remove();
+  nodes.boardGrid.querySelector(".inline-board-form")?.remove();
   const columns = Array.from({ length: TABORA_BOARD_COLUMNS }, (_, columnIndex) => {
-    const column = document.createElement("div");
-    column.className = "board-column";
-    column.dataset.boardColumn = String(columnIndex);
-    nodes.boardGrid.append(column);
+    let column = nodes.boardGrid.querySelector(`[data-board-column="${columnIndex}"]`);
+    if (!column) {
+      column = document.createElement("div");
+      column.className = "board-column";
+      column.dataset.boardColumn = String(columnIndex);
+      nodes.boardGrid.append(column);
+    }
+    column.hidden = false;
     return column;
   });
   for (let columnIndex = 0; columnIndex < columns.length; columnIndex += 1) {
-    boards
+    const cards = boards
       .filter((board) => board.column === columnIndex)
       .sort((a, b) => Number(b.pinned) - Number(a.pinned) || (a.columnOrder || 0) - (b.columnOrder || 0))
-      .forEach((board) => columns[columnIndex].append(createBoardCard(board, query)));
+      .map((board) => {
+        const signature = JSON.stringify([board, query, appState.settings.showBookmarkDescriptions, appState.settings.organizeMode]);
+        const cached = boardCardCache.get(board.id);
+        if (cached?.signature === signature) return cached.card;
+        const card = createBoardCard(board, query);
+        boardCardCache.set(board.id, { card, signature });
+        return card;
+      });
+    columns[columnIndex].replaceChildren(...cards);
   }
   if (!query) nodes.boardGrid.append(createAddBoardTile());
 
   if (!boards.length && query) {
-    columns.forEach((column) => column.remove());
+    columns.forEach((column) => { column.hidden = true; });
     const empty = document.createElement("div");
     empty.className = "search-empty";
     empty.innerHTML = "<strong>No matching links</strong><span>Try a different title, domain, or URL.</span>";
     nodes.boardGrid.append(empty);
+  }
+
+  const currentBoardIds = new Set(appState.boards.map((board) => board.id));
+  for (const boardId of boardCardCache.keys()) {
+    if (!currentBoardIds.has(boardId)) boardCardCache.delete(boardId);
   }
 }
 
@@ -713,10 +744,40 @@ function pageMenuItems(page) {
   ];
 }
 
-async function refresh(message = "") {
-  appState = await getTaboraState();
-  render();
-  if (message) showToast(message);
+function queueRefresh({ message = "", state = null, appearance = false } = {}) {
+  if (state) pendingRefreshState = state;
+  if (message) pendingRefreshMessage = message;
+  pendingRefreshAppearance ||= appearance;
+
+  const promise = new Promise((resolve, reject) => pendingRefreshWaiters.push({ resolve, reject }));
+  if (refreshTimer) clearTimeout(refreshTimer);
+  refreshTimer = setTimeout(() => {
+    refreshTimer = null;
+    const nextState = pendingRefreshState;
+    const shouldApplyAppearance = pendingRefreshAppearance;
+    const nextMessage = pendingRefreshMessage;
+    const waiters = pendingRefreshWaiters;
+    pendingRefreshState = null;
+    pendingRefreshAppearance = false;
+    pendingRefreshMessage = "";
+    pendingRefreshWaiters = [];
+
+    refreshChain = refreshChain.catch(() => {}).then(async () => {
+      appState = nextState || await getTaboraState();
+      if (shouldApplyAppearance) await applyAppearance();
+      render();
+      if (nextMessage) showToast(nextMessage);
+    });
+    refreshChain.then(
+      () => waiters.forEach(({ resolve }) => resolve()),
+      (error) => waiters.forEach(({ reject }) => reject(error))
+    );
+  }, 24);
+  return promise;
+}
+
+function refresh(message = "", options = {}) {
+  return queueRefresh({ message, appearance: Boolean(options.appearance) });
 }
 
 nodes.pageTabs.addEventListener("click", async (event) => {
@@ -913,6 +974,8 @@ function openSearch() {
 
 function closeSearch() {
   if (nodes.searchPanel.hidden) return;
+  if (searchRenderTimer) clearTimeout(searchRenderTimer);
+  searchRenderTimer = null;
   nodes.searchPanel.hidden = true;
   nodes.globalSearch.value = "";
   syncSearchState();
@@ -923,8 +986,22 @@ searchTool.addEventListener("click", () => {
   if (nodes.searchPanel.hidden) openSearch();
   else closeSearch();
 });
-nodes.globalSearch.addEventListener("input", () => { syncSearchState(); renderBoards(); });
-clearSearchButton.addEventListener("click", () => { nodes.globalSearch.value = ""; syncSearchState(); renderBoards(); nodes.globalSearch.focus(); });
+nodes.globalSearch.addEventListener("input", () => {
+  syncSearchState();
+  if (searchRenderTimer) clearTimeout(searchRenderTimer);
+  searchRenderTimer = setTimeout(() => {
+    searchRenderTimer = null;
+    renderBoards();
+  }, 140);
+});
+clearSearchButton.addEventListener("click", () => {
+  if (searchRenderTimer) clearTimeout(searchRenderTimer);
+  searchRenderTimer = null;
+  nodes.globalSearch.value = "";
+  syncSearchState();
+  renderBoards();
+  nodes.globalSearch.focus();
+});
 
 document.querySelector("#incognitoTool").addEventListener("click", async () => {
   await setSetting("incognitoMode", !appState.settings.incognitoMode);
@@ -1093,23 +1170,23 @@ function animateBoardReflow(previousRects) {
 function showOrganizeDropIndicator(event) {
   if (draggedItem?.type !== "board") { clearOrganizeDropIndicator(); return; }
   const columns = [...nodes.boardGrid.querySelectorAll("[data-board-column]")];
+  const columnRects = new Map(columns.map((item) => [item, item.getBoundingClientRect()]));
   const column = event.target.closest("[data-board-column]") || columns.reduce((nearest, item) => {
-    const rect = item.getBoundingClientRect();
+    const rect = columnRects.get(item);
     const distance = Math.abs(event.clientX - (rect.left + rect.width / 2));
     return !nearest || distance < nearest.distance ? { item, distance } : nearest;
   }, null)?.item;
   if (!column) { clearOrganizeDropIndicator(); return; }
 
   const cards = [...column.querySelectorAll(".board-card:not(.dragging)")];
-  const beforeCard = cards.find((card) => {
-    const rect = card.getBoundingClientRect();
-    return event.clientY < rect.top + rect.height / 2;
-  }) || null;
+  const cardRects = cards.map((card) => ({ card, rect: card.getBoundingClientRect() }));
+  const beforeEntry = cardRects.find(({ rect }) => event.clientY < rect.top + rect.height / 2) || null;
+  const beforeCard = beforeEntry?.card || null;
   const gridRect = nodes.boardGrid.getBoundingClientRect();
-  const columnRect = column.getBoundingClientRect();
-  const lastCardRect = cards.at(-1)?.getBoundingClientRect();
+  const columnRect = columnRects.get(column);
+  const lastCardRect = cardRects.at(-1)?.rect;
   const top = beforeCard
-    ? beforeCard.getBoundingClientRect().top - gridRect.top - 12
+    ? beforeEntry.rect.top - gridRect.top - 12
     : lastCardRect
       ? lastCardRect.bottom - gridRect.top + 12
       : columnRect.top - gridRect.top + 3;
@@ -1131,16 +1208,27 @@ function showOrganizeDropIndicator(event) {
 nodes.boardGrid.addEventListener("dragend", (event) => {
   event.target.classList.remove("dragging");
   draggedItem = null;
+  pendingOrganizePointer = null;
+  if (organizeDragFrame) cancelAnimationFrame(organizeDragFrame);
+  organizeDragFrame = null;
   clearOrganizeDropIndicator();
 });
 nodes.boardGrid.addEventListener("dragover", (event) => {
   if (!draggedItem) return;
   event.preventDefault();
   event.dataTransfer.dropEffect = "move";
-  showOrganizeDropIndicator(event);
+  pendingOrganizePointer = { clientX: event.clientX, clientY: event.clientY, target: event.target };
+  if (organizeDragFrame) return;
+  organizeDragFrame = requestAnimationFrame(() => {
+    organizeDragFrame = null;
+    if (pendingOrganizePointer) showOrganizeDropIndicator(pendingOrganizePointer);
+  });
 });
 nodes.boardGrid.addEventListener("drop", async (event) => {
   event.preventDefault();
+  pendingOrganizePointer = null;
+  if (organizeDragFrame) cancelAnimationFrame(organizeDragFrame);
+  organizeDragFrame = null;
   const droppedItem = draggedItem;
   const previousBoardRects = captureBoardRects();
   const targetBoard = event.target.closest(".board-card");
@@ -1414,18 +1502,25 @@ document.querySelector("#emptyTrash").addEventListener("click", async () => {
 
 async function renderAppearancePanel() {
   document.querySelectorAll("[data-theme]").forEach((button) => button.classList.toggle("active", button.dataset.theme === appState.settings.theme));
-  wallpaperPreviewUrls.forEach((url) => URL.revokeObjectURL(url));
-  wallpaperPreviewUrls = [];
-
   const customWallpapers = await getCustomWallpapers();
+  const customWallpaperIds = new Set(customWallpapers.map((wallpaper) => wallpaper.id));
+  for (const [id, url] of wallpaperPreviewUrls) {
+    if (!customWallpaperIds.has(id)) {
+      URL.revokeObjectURL(url);
+      wallpaperPreviewUrls.delete(id);
+    }
+  }
   const customSection = document.querySelector("#yourWallpapersSection");
   const customGrid = document.querySelector("#yourWallpaperGrid");
   customSection.hidden = customWallpapers.length === 0;
   document.querySelector("#yourWallpaperCount").textContent = String(customWallpapers.length);
   customGrid.innerHTML = "";
   for (const wallpaper of customWallpapers) {
-    const url = URL.createObjectURL(wallpaper.blob);
-    wallpaperPreviewUrls.push(url);
+    let url = wallpaperPreviewUrls.get(wallpaper.id);
+    if (!url) {
+      url = URL.createObjectURL(wallpaper.blob);
+      wallpaperPreviewUrls.set(wallpaper.id, url);
+    }
     const card = document.createElement("article");
     card.className = "custom-wallpaper-card";
     card.classList.toggle("selected", wallpaper.id === appState.settings.wallpaper);
@@ -1451,7 +1546,10 @@ async function renderAppearancePanel() {
     button.className = "wallpaper-swatch";
     button.dataset.wallpaper = wallpaper.id;
     button.classList.toggle("selected", wallpaper.id === appState.settings.wallpaper);
-    if (wallpaper.image) button.style.backgroundImage = `url("${wallpaper.image}")`;
+    if (wallpaper.image) {
+      const thumbnail = wallpaper.thumbnail || wallpaper.image.replace("assets/", "assets/wallpaper-thumbs/");
+      button.style.backgroundImage = `url("${thumbnail}")`;
+    }
     else button.classList.add("default-swatch");
     const label = document.createElement("span");
     label.textContent = wallpaper.name;
@@ -1690,6 +1788,8 @@ async function applyAppearance() {
   const definition = WALLPAPERS.find((wallpaper) => wallpaper.id === appState.settings.wallpaper && wallpaper.theme === appState.settings.theme)
     || WALLPAPERS.find((wallpaper) => wallpaper.id === "none" && wallpaper.theme === appState.settings.theme);
   const isCustomWallpaper = appState.settings.wallpaper.startsWith("custom");
+  const appearanceKey = `${appState.settings.theme}:${appState.settings.wallpaper}`;
+  if (appearanceKey === appliedAppearanceKey) return;
   document.body.dataset.palette = isCustomWallpaper
     ? (appState.settings.theme === "light" ? "light-default" : "dark-default")
     : definition.palette;
@@ -1700,6 +1800,7 @@ async function applyAppearance() {
     const blob = await getWallpaperBlob(appState.settings.wallpaper);
     if (blob) { customWallpaperUrl = URL.createObjectURL(blob); backdrop.style.backgroundImage = `url("${customWallpaperUrl}")`; }
   }
+  appliedAppearanceKey = appearanceKey;
 }
 
 document.querySelector("#skipOnboarding").addEventListener("click", async () => { await setSetting("onboardingComplete", true); await refresh(); });
@@ -1713,5 +1814,13 @@ document.addEventListener("keydown", (event) => {
   if (event.key === "Escape" && !nodes.searchPanel.hidden) { event.preventDefault(); closeSearch(); return; }
   if (event.key === "/" && !event.target.matches("input, textarea")) { event.preventDefault(); openSearch(); }
 });
-chrome.storage.onChanged.addListener((changes) => { if (changes[TABORA_STORAGE_KEY]) init(); });
+chrome.storage.onChanged.addListener((changes) => {
+  const change = changes[TABORA_STORAGE_KEY];
+  if (!change?.newValue) return;
+  const nextState = normalizeState(change.newValue);
+  const appearanceChanged = nextState.settings.theme !== appState.settings.theme
+    || nextState.settings.wallpaper !== appState.settings.wallpaper;
+  void queueRefresh({ state: nextState, appearance: appearanceChanged })
+    .catch((error) => console.error("Tabora could not refresh after a storage change", error));
+});
 init();

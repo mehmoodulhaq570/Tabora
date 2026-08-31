@@ -54,9 +54,12 @@ function normalizeState(value) {
       link.health = link.health && typeof link.health === "object" ? link.health : null;
     }
   }
+  const boardsByPage = new Map(state.pages.map((page) => [page.id, []]));
+  for (const board of state.boards) {
+    boardsByPage.get(board.pageId)?.push(board);
+  }
   for (const page of state.pages) {
-    const pageBoards = [...state.boards]
-      .filter((board) => board.pageId === page.id)
+    const pageBoards = (boardsByPage.get(page.id) || [])
       .sort((a, b) => (a.order || 0) - (b.order || 0));
     pageBoards.forEach((board, index) => {
       if (!Number.isInteger(board.column)) board.column = index % TABORA_BOARD_COLUMNS;
@@ -572,11 +575,19 @@ async function openLinks(links, incognito = false) {
   }
 }
 
+const boardSearchTextCache = new WeakMap();
+
 function boardMatches(board, query) {
   const normalized = String(query || "").trim().toLowerCase();
   if (!normalized) return true;
-  return [board.name, ...board.links.flatMap((link) => [link.title, link.url, link.note])]
-    .some((value) => String(value || "").toLowerCase().includes(normalized));
+  let searchText = boardSearchTextCache.get(board);
+  if (!searchText) {
+    searchText = [board.name, ...board.links.flatMap((link) => [link.title, link.url, link.note])]
+      .map((value) => String(value || "").toLowerCase())
+      .join("\n");
+    boardSearchTextCache.set(board, searchText);
+  }
+  return searchText.includes(normalized);
 }
 
 function faviconNode(link) {
@@ -585,6 +596,8 @@ function faviconNode(link) {
     image.className = "favicon";
     image.src = link.favIconUrl;
     image.alt = "";
+    image.loading = "lazy";
+    image.decoding = "async";
     image.referrerPolicy = "no-referrer";
     return image;
   }
