@@ -2,6 +2,8 @@ const TABORA_STORAGE_KEY = "taboraV2";
 const TABORA_UNDO_KEY = "taboraUndo";
 const TABORA_SCHEMA_VERSION = 4;
 const TABORA_BOARD_COLUMNS = 4;
+const TABORA_SHARE_FORMAT = "tabora-share";
+const TABORA_SHARE_VERSION = 1;
 
 function makeId(prefix) {
   return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -213,6 +215,137 @@ function getDomain(value) {
   } catch {
     return "Invalid URL";
   }
+}
+
+function sharedLinkSnapshot(link, index) {
+  const url = normalizeUrl(link?.url);
+  if (!url) return null;
+  return {
+    title: cleanName(link.title, getDomain(url)),
+    url,
+    favIconUrl: String(link.favIconUrl || "").slice(0, 4096),
+    note: String(link.note || "").trim().slice(0, 2000),
+    order: index
+  };
+}
+
+function sharedBoardSnapshot(board, index = 0) {
+  const links = (Array.isArray(board?.links) ? board.links : [])
+    .map(sharedLinkSnapshot)
+    .filter(Boolean)
+    .sort((a, b) => a.order - b.order)
+    .map((link, linkIndex) => ({ ...link, order: linkIndex }));
+  return {
+    name: cleanName(board?.name, `Shared Board ${index + 1}`),
+    color: ["green", "blue", "amber", "rose", "violet", "slate"].includes(board?.color) ? board.color : "green",
+    icon: ["folder", "briefcase", "book", "star", "code", "spark"].includes(board?.icon) ? board.icon : "folder",
+    size: ["small", "medium", "large"].includes(board?.size) ? board.size : "medium",
+    pinned: Boolean(board?.pinned),
+    column: Math.max(0, Math.min(TABORA_BOARD_COLUMNS - 1, Number(board?.column) || 0)),
+    columnOrder: Math.max(0, Number(board?.columnOrder) || 0),
+    links
+  };
+}
+
+function createTaboraBoardPackage(board) {
+  return {
+    format: TABORA_SHARE_FORMAT,
+    version: TABORA_SHARE_VERSION,
+    type: "board",
+    exportedAt: new Date().toISOString(),
+    board: sharedBoardSnapshot(board)
+  };
+}
+
+function createTaboraPagePackage(page, boards) {
+  return {
+    format: TABORA_SHARE_FORMAT,
+    version: TABORA_SHARE_VERSION,
+    type: "page",
+    exportedAt: new Date().toISOString(),
+    page: { name: cleanName(page?.name, "Shared Page") },
+    boards: ordered(Array.isArray(boards) ? boards : [])
+      .sort((a, b) => a.column - b.column || a.columnOrder - b.columnOrder)
+      .map(sharedBoardSnapshot)
+  };
+}
+
+function parseTaboraPackage(value) {
+  if (!value || typeof value !== "object" || value.format !== TABORA_SHARE_FORMAT || value.version !== TABORA_SHARE_VERSION) {
+    throw new Error("Unsupported Tabora package");
+  }
+  if (value.type === "board") {
+    if (!value.board || typeof value.board !== "object") throw new Error("Missing shared board");
+    return { type: "board", board: sharedBoardSnapshot(value.board) };
+  }
+  if (value.type === "page") {
+    if (!value.page || typeof value.page !== "object" || !Array.isArray(value.boards)) throw new Error("Missing shared page");
+    if (value.boards.length > 100) throw new Error("Too many shared boards");
+    return {
+      type: "page",
+      page: { name: cleanName(value.page.name, "Shared Page") },
+      boards: value.boards.map(sharedBoardSnapshot)
+    };
+  }
+  throw new Error("Unknown Tabora package type");
+}
+
+async function importTaboraPackage(value, destinationPageId) {
+  const shared = parseTaboraPackage(value);
+  return updateTaboraState((state) => {
+    let page;
+    if (shared.type === "page") {
+      page = {
+        id: makeId("page"),
+        name: cleanName(shared.page.name, "Shared Page"),
+        order: state.pages.length,
+        protected: false
+      };
+      state.pages.push(page);
+    } else {
+      page = state.pages.find((item) => item.id === destinationPageId)
+        || state.pages.find((item) => item.id === state.settings.activePageId)
+        || state.pages[0];
+    }
+
+    const sharedBoards = shared.type === "board" ? [shared.board] : shared.boards;
+    const existingBoards = state.boards.filter((board) => board.pageId === page.id);
+    const boardsByColumn = new Map(Array.from({ length: TABORA_BOARD_COLUMNS }, (_, column) => [column, []]));
+    for (const board of existingBoards) boardsByColumn.get(board.column)?.push(board);
+
+    const importedBoards = sharedBoards.map((source, index) => {
+      const column = source.column;
+      const columnBoards = boardsByColumn.get(column);
+      const columnOrder = shared.type === "page" && columnBoards.length === 0
+        ? source.columnOrder
+        : columnBoards.length;
+      const board = {
+        id: makeId("board"),
+        pageId: page.id,
+        name: source.name,
+        order: existingBoards.length + index,
+        column,
+        columnOrder,
+        starred: false,
+        pinned: source.pinned,
+        color: source.color,
+        icon: source.icon,
+        size: source.size,
+        createdAt: Date.now() + index,
+        links: source.links.map((link, linkIndex) => ({ ...link, id: makeId("link"), order: linkIndex }))
+      };
+      columnBoards.push(board);
+      state.boards.push(board);
+      return board;
+    });
+    state.settings.activePageId = page.id;
+    return {
+      type: shared.type,
+      page,
+      boardCount: importedBoards.length,
+      linkCount: importedBoards.reduce((count, board) => count + board.links.length, 0)
+    };
+  }, { undoLabel: shared.type === "page" ? "Shared page import" : "Shared board import" });
 }
 
 async function addPage(name) {

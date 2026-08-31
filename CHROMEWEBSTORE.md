@@ -22,6 +22,8 @@ Use the toolbar popup to save the current tab or window. Open a new tab to manag
 
 Tabora stores its workspace locally in the current browser profile. It does not require an account, sell user data, or send the saved workspace to Tabora servers. The optional link checker and link-detail fetching contact a saved or user-entered website only after the user starts the relevant save or import action and allows optional site access in Chrome. Chrome remembers that choice for future actions.
 
+Individual pages and boards can be exported as local `.tabora` files for the user to send manually. Tabora does not upload or transmit those files.
+
 **Category**
 
 Productivity
@@ -109,6 +111,7 @@ The optional broken-link checker and link-detail fetching send standard HTTP req
 
 | Version | Date | Changes | Status |
 |---------|------|---------|--------|
+| Next release | 2026-08-31 | Added portable `.tabora` files for exporting and importing individual boards and pages locally | Draft |
 | Next release | 2026-08-31 | Added six premium dark and light wallpaper presets with matching glass UI palettes | Draft |
 | Next release | 2026-08-31 | Added optimized Tabora icon assets for the Chrome toolbar, extension manager, and store listing | Draft |
 | Next release | 2026-08-31 | Added automatic link metadata fetching during dashboard saves and imports with one-time optional site access | Draft |

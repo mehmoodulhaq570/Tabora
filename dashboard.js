@@ -51,6 +51,7 @@ let customWallpaperUrl = "";
 const wallpaperPreviewUrls = new Map();
 let toastTimer = null;
 let pendingImportGroups = [];
+let pendingTaboraPackage = null;
 let boardInsertionPlacement = { column: 0, order: 0 };
 let organizeSnapshot = null;
 let organizeDropTarget = null;
@@ -410,6 +411,13 @@ function showToast(message, tone = "") {
   }, 3600);
 }
 
+function importFailureMessage(error) {
+  const message = String(error?.message || "");
+  if (/quota|storage/i.test(message)) return "Could not import: Tabora storage is full.";
+  if (/unsupported tabora package|missing shared|unknown tabora package/i.test(message)) return "This is not a valid Tabora shared file.";
+  return "Could not import this Tabora shared file.";
+}
+
 function requestDeleteConfirmation({ title, prompt, warning = "", caution = "This action cannot be undone.", compact = false, submitLabel = "Delete" }) {
   if (deleteConfirmationResolve) settleDeleteConfirmation(false);
   nodes.deleteConfirmDialog.classList.toggle("compact", compact);
@@ -743,7 +751,8 @@ function boardMenuItems(board) {
     { icon: BOARD_MENU_ICONS.add, label: "Add link", action: () => openInlineLinkEditor(board.id) },
     { icon: PAGE_MENU_ICONS.rename, label: "Customize board", action: () => openBoardDialog(board) },
     { icon: BOARD_ICONS.star.replace("<svg", '<svg class="menu-icon"'), label: board.pinned ? "Unpin board" : "Pin board", action: async () => { await customizeBoard(board.id, { pinned: !board.pinned }); await refresh(board.pinned ? "Board unpinned" : "Board pinned"); } },
-    { icon: PAGE_MENU_ICONS.share, label: "Share / copy links", action: () => copyBoardLinks(board) }
+    { icon: PAGE_MENU_ICONS.share, label: "Copy board links", action: () => copyBoardLinks(board) },
+    { icon: PAGE_MENU_ICONS.share, label: "Export board", action: () => exportBoardPackage(board) }
   ];
   const otherPages = ordered(appState.pages).filter((page) => page.id !== board.pageId);
   for (const page of otherPages) {
@@ -851,7 +860,8 @@ async function copySingleLink(link) {
 function pageMenuItems(page) {
   return [
     { icon: PAGE_MENU_ICONS.rename, label: "Rename", action: () => openPageDialog(page) },
-    { icon: PAGE_MENU_ICONS.share, label: "Share Page", action: () => copyPageLinks(page) },
+    { icon: PAGE_MENU_ICONS.share, label: "Copy page links", action: () => copyPageLinks(page) },
+    { icon: PAGE_MENU_ICONS.share, label: "Export page", action: () => exportPagePackage(page) },
     { separator: true },
     { icon: PAGE_MENU_ICONS.delete, label: "Delete", danger: true, action: async () => {
       if (page.protected) { showToast("The Home page cannot be deleted"); return; }
@@ -1287,6 +1297,8 @@ document.querySelector("#importTool").addEventListener("click", () => {
   nodes.importPreview.hidden = true;
   document.querySelector(".import-options").hidden = false;
   pendingImportGroups = [];
+  pendingTaboraPackage = null;
+  document.querySelector("#commitImport").textContent = "Import and fetch details";
   nodes.importDialog.showModal();
 });
 document.querySelector("#trashTool").addEventListener("click", async () => {
@@ -1492,6 +1504,7 @@ function parseTextLinks(text) {
 }
 
 function prepareImport(groups) {
+  pendingTaboraPackage = null;
   const existingUrls = new Set(appState.boards.filter((board) => board.pageId === activePage().id).flatMap((board) => board.links.map((link) => normalizeUrl(link.url))));
   const seen = new Set(existingUrls);
   let duplicates = 0;
@@ -1523,6 +1536,31 @@ function prepareImport(groups) {
     setText(row, "span", `${group.links.length} links`);
     list.append(row);
   }
+}
+
+function prepareTaboraPackageImport(taboraPackage) {
+  pendingImportGroups = [];
+  pendingTaboraPackage = taboraPackage;
+  const boards = taboraPackage.type === "board" ? [taboraPackage.board] : taboraPackage.boards;
+  const total = boards.reduce((count, board) => count + board.links.length, 0);
+  nodes.textImportPanel.hidden = true;
+  document.querySelector(".import-options").hidden = true;
+  nodes.importPreview.hidden = false;
+  document.querySelector("#importPreviewTitle").textContent = `${boards.length} shared ${boards.length === 1 ? "board" : "boards"} with ${total} ${total === 1 ? "link" : "links"}`;
+  document.querySelector("#importPreviewDetails").textContent = taboraPackage.type === "page"
+    ? `A new page named "${taboraPackage.page.name}" will be added to Tabora.`
+    : `This board will be added to the current page, "${activePage().name}".`;
+  const list = document.querySelector("#importPreviewBoards");
+  list.innerHTML = "";
+  for (const board of boards) {
+    const row = document.createElement("div");
+    row.className = "preview-board-row";
+    row.innerHTML = "<strong></strong><span></span>";
+    setText(row, "strong", board.name);
+    setText(row, "span", `${board.links.length} links`);
+    list.append(row);
+  }
+  document.querySelector("#commitImport").textContent = taboraPackage.type === "page" ? "Import page" : "Import board";
 }
 
 async function importBrowserBookmarks() {
@@ -1561,6 +1599,16 @@ document.querySelector("#importFile").addEventListener("change", async (event) =
   const file = event.target.files[0];
   if (!file) return;
   const text = await file.text();
+  if (/\.tabora$/i.test(file.name)) {
+    try {
+      prepareTaboraPackageImport(parseTaboraPackage(JSON.parse(text)));
+    } catch (error) {
+      console.error("Could not import Tabora package", error);
+      showToast("This is not a valid Tabora shared file", "warning");
+    }
+    event.target.value = "";
+    return;
+  }
   let links = [];
   if (/\.html?$/i.test(file.name)) {
     const doc = new DOMParser().parseFromString(text, "text/html");
@@ -1571,13 +1619,42 @@ document.querySelector("#importFile").addEventListener("change", async (event) =
 });
 
 document.querySelector("#cancelImportPreview").addEventListener("click", () => {
+  pendingTaboraPackage = null;
+  pendingImportGroups = [];
   nodes.importPreview.hidden = true;
   document.querySelector(".import-options").hidden = false;
+  document.querySelector("#commitImport").textContent = "Import and fetch details";
 });
 
 document.querySelector("#commitImport").addEventListener("click", async () => {
-  if (!pendingImportGroups.length) return;
   const button = document.querySelector("#commitImport");
+  if (pendingTaboraPackage) {
+    button.disabled = true;
+    button.textContent = "Importing...";
+    let imported;
+    try {
+      ({ result: imported } = await importTaboraPackage(pendingTaboraPackage, activePage().id));
+    } catch (error) {
+      console.error("Could not import Tabora package", error);
+      showToast(importFailureMessage(error), "warning");
+      button.textContent = pendingTaboraPackage?.type === "page" ? "Import page" : "Import board";
+      return;
+    } finally {
+      button.disabled = false;
+    }
+
+    pendingTaboraPackage = null;
+    nodes.importDialog.close();
+    try {
+      await refresh(`${imported.boardCount} shared ${imported.boardCount === 1 ? "board" : "boards"} and ${imported.linkCount} ${imported.linkCount === 1 ? "link" : "links"} imported`);
+    } catch (error) {
+      console.error("Tabora package imported but the dashboard did not refresh", error);
+      showToast("Shared file imported. Reload Tabora to show it.", "warning");
+    }
+    button.textContent = "Import and fetch details";
+    return;
+  }
+  if (!pendingImportGroups.length) return;
   const total = pendingImportGroups.reduce((sum, group) => sum + group.links.length, 0);
   button.disabled = true;
   button.textContent = "Fetching details...";
@@ -1790,6 +1867,37 @@ function exportTaboraData() {
   anchor.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
   showToast("Tabora backup exported");
+}
+
+function packageFilename(name, type) {
+  const safeName = String(name || "tabora")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 48) || "tabora";
+  return `${safeName}-${type}.tabora`;
+}
+
+function downloadTaboraPackage(taboraPackage, filename) {
+  const blob = new Blob([JSON.stringify(taboraPackage, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function exportBoardPackage(board) {
+  downloadTaboraPackage(createTaboraBoardPackage(board), packageFilename(board.name, "board"));
+  showToast("Board exported as a Tabora file");
+}
+
+function exportPagePackage(page) {
+  const boards = appState.boards.filter((board) => board.pageId === page.id);
+  downloadTaboraPackage(createTaboraPagePackage(page, boards), packageFilename(page.name, "page"));
+  showToast("Page exported as a Tabora file");
 }
 
 document.querySelector("#exportTaboraData").addEventListener("click", exportTaboraData);

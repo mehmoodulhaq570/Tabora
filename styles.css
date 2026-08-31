@@ -730,8 +730,8 @@ textarea.dark-input { min-height: 92px; padding-top: 10px; resize: vertical; }
   z-index: 55;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
-  width: 414px;
-  height: min(566px, calc(100vh - 40px));
+  width: 380px;
+  height: min(520px, calc(100vh - 40px));
   overflow: hidden;
   border: 1px solid var(--line-strong);
   border-radius: 8px;
@@ -1273,7 +1273,7 @@ body[data-palette="glacier"] {
   .onboarding-card { align-items: flex-start; flex-direction: column; gap: 14px; }
   .onboarding-actions { width: 100%; }
   .onboarding-actions button { flex: 1 1 0; }
-  .appearance-panel { left: 16px; bottom: 70px; width: min(414px, calc(100% - 32px)); height: min(566px, calc(100vh - 94px)); }
+  .appearance-panel { left: 16px; bottom: 70px; width: min(380px, calc(100% - 32px)); height: min(520px, calc(100vh - 94px)); }
   .settings-dialog { width: calc(100% - 24px); height: calc(100vh - 24px); }
   .settings-layout { grid-template-columns: 190px minmax(0, 1fr); }
   .settings-content { padding: 42px 24px; }

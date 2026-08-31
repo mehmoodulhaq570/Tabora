@@ -18,7 +18,7 @@ const chrome = {
 
 const context = vm.createContext({ chrome, console, structuredClone, URL, setTimeout, clearTimeout });
 const source = `${fs.readFileSync("shared.js", "utf8")}
-globalThis.tabora = { createDefaultState, getTaboraState, saveTaboraState, addBoard, addLink, updateLink, customizeBoard, deleteBoard, undoLastAction };`;
+globalThis.tabora = { createDefaultState, getTaboraState, saveTaboraState, addBoard, addLink, updateLink, customizeBoard, deleteBoard, undoLastAction, createTaboraBoardPackage, createTaboraPagePackage, parseTaboraPackage, importTaboraPackage };`;
 vm.runInContext(source, context);
 
 (async () => {
@@ -48,13 +48,33 @@ vm.runInContext(source, context);
   state = await api.getTaboraState();
   assert.equal(state.boards[0].links[0].favIconUrl, "https://example.com/favicon.ico");
 
+  const boardPackage = api.createTaboraBoardPackage(state.boards[0]);
+  assert.equal(boardPackage.type, "board");
+  assert.equal(boardPackage.board.links[0].id, undefined);
+  const importedBoard = await api.importTaboraPackage(boardPackage, "home");
+  state = await api.getTaboraState();
+  assert.equal(importedBoard.result.boardCount, 1);
+  assert.equal(state.boards.length, 2);
+  assert.notEqual(state.boards[0].id, state.boards[1].id);
+  assert.notEqual(state.boards[0].links[0].id, state.boards[1].links[0].id);
+  assert.equal(state.boards[1].color, "blue");
+  assert.equal(state.boards[1].size, "large");
+  assert.equal(state.boards[1].links[0].url, "https://example.com/");
+
+  const pagePackage = api.createTaboraPagePackage({ name: "Shared Research" }, [state.boards[0]]);
+  const importedPage = await api.importTaboraPackage(pagePackage, "home");
+  state = await api.getTaboraState();
+  assert.equal(importedPage.result.type, "page");
+  assert.ok(state.pages.some((page) => page.name === "Shared Research"));
+  assert.throws(() => api.parseTaboraPackage({ type: "board" }), /Unsupported Tabora package/);
+
   await api.deleteBoard(boardId);
   state = await api.getTaboraState();
-  assert.equal(state.boards.length, 0);
+  assert.equal(state.boards.length, 2);
   assert.equal(state.trash.length, 1);
   assert.equal(await api.undoLastAction(), "Board deletion");
   state = await api.getTaboraState();
-  assert.equal(state.boards.length, 1);
+  assert.equal(state.boards.length, 3);
   assert.equal(state.trash.length, 0);
 
   console.log("shared state tests passed");
