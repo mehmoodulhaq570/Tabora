@@ -5,7 +5,7 @@ const vm = require("node:vm");
 
 const source = fs.readFileSync("background.js", "utf8");
 
-function loadBackground() {
+function loadBackground({ useBrowserNamespace = false, workerContext = true } = {}) {
   const listeners = {};
   const chrome = {
     action: {
@@ -19,14 +19,14 @@ function loadBackground() {
   const context = {
     addBoard: async () => ({ result: null }),
     addLink: async () => ({ result: null }),
-    chrome,
     console,
     findDuplicateLink: () => null,
     getTaboraState: async () => ({ boards: [], settings: {} }),
-    importScripts: () => {},
     normalizeUrl: () => "",
     setTimeout
   };
+  if (workerContext) context.importScripts = () => {};
+  context[useBrowserNamespace ? "browser" : "chrome"] = chrome;
   vm.runInNewContext(source, context, { filename: "background.js" });
   return listeners;
 }
@@ -35,4 +35,9 @@ test("background starts without installation or alarms APIs", () => {
   const listeners = loadBackground();
   assert.equal(typeof listeners.command, "function");
   assert.doesNotMatch(source, /chrome\.alarms|onInstalled/);
+});
+
+test("background starts with Firefox's browser namespace", () => {
+  const listeners = loadBackground({ useBrowserNamespace: true, workerContext: false });
+  assert.equal(typeof listeners.command, "function");
 });

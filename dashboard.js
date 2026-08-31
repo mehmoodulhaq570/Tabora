@@ -1,3 +1,5 @@
+var extensionApi = globalThis.browser ?? globalThis.chrome;
+
 const nodes = {
   pageTabs: document.querySelector("#pageTabs"),
   pageDialog: document.querySelector("#pageDialog"),
@@ -529,11 +531,11 @@ async function fetchLinkMetadata(url) {
 }
 
 async function requestLinkMetadataAccess() {
-  if (!chrome.permissions?.request) return false;
+  if (!extensionApi.permissions?.request) return false;
   const request = { origins: ["http://*/*", "https://*/*"] };
   try {
-    if (chrome.permissions.contains && await chrome.permissions.contains(request)) return true;
-    return await chrome.permissions.request(request);
+    if (extensionApi.permissions.contains && await extensionApi.permissions.contains(request)) return true;
+    return await extensionApi.permissions.request(request);
   } catch {
     return false;
   }
@@ -784,11 +786,11 @@ async function openSingleLink(link) {
     const board = appState.boards.find((item) => item.links.some((candidate) => candidate.id === link.id));
     if (board) await recordLinkOpened(board.id, link.id);
     if (appState.settings.incognitoMode) {
-      await chrome.windows.create({ url: link.url, incognito: true, focused: true });
+      await extensionApi.windows.create({ url: link.url, incognito: true, focused: true });
     } else if (appState.settings.openLinksInNewTab) {
-      await chrome.tabs.create({ url: link.url, active: true });
+      await extensionApi.tabs.create({ url: link.url, active: true });
     } else {
-      await chrome.tabs.update({ url: link.url });
+      await extensionApi.tabs.update({ url: link.url });
     }
   } catch {
     showToast("Could not open a private window. Check Brave extension settings.");
@@ -1564,9 +1566,9 @@ function prepareTaboraPackageImport(taboraPackage) {
 }
 
 async function importBrowserBookmarks() {
-  const granted = await chrome.permissions.request({ permissions: ["bookmarks"] });
+  const granted = await extensionApi.permissions.request({ permissions: ["bookmarks"] });
   if (!granted) { showToast("Bookmark access was not granted"); return; }
-  const tree = await chrome.bookmarks.getTree();
+  const tree = await extensionApi.bookmarks.getTree();
   const groups = [];
   const loose = [];
   function walk(node, parentTitle = "") {
@@ -1586,7 +1588,7 @@ document.querySelector(".import-options").addEventListener("click", async (event
   if (!option) return;
   if (option.dataset.import === "bookmarks") await importBrowserBookmarks();
   if (option.dataset.import === "window") {
-    const tabs = await chrome.tabs.query({ currentWindow: true });
+    const tabs = await extensionApi.tabs.query({ currentWindow: true });
     const links = tabs.filter((tab) => normalizeUrl(tab.url)).map((tab) => ({ title: tab.title, url: tab.url, favIconUrl: tab.favIconUrl || "" }));
     prepareImport([{ name: "Current Window", links }]);
   }
@@ -1664,7 +1666,7 @@ document.querySelector("#commitImport").addEventListener("click", async () => {
     ...group,
     links: group.links.map((link) => enrichedByUrl.get(normalizeUrl(link.url)) || link)
   }));
-  await chrome.storage.local.set({ taboraLastImportBackup: structuredClone(appState) });
+  await extensionApi.storage.local.set({ taboraLastImportBackup: structuredClone(appState) });
   for (const group of pendingImportGroups) await addBoard(activePage().id, group.name, group.links);
   pendingImportGroups = [];
   nodes.importDialog.close();
@@ -1852,9 +1854,9 @@ document.querySelector("#languageSelect").addEventListener("change", async (even
 
 document.querySelector("#changeShortcut").addEventListener("click", async () => {
   try {
-    await chrome.tabs.create({ url: "brave://extensions/shortcuts" });
+    await extensionApi.tabs.create({ url: "brave://extensions/shortcuts" });
   } catch {
-    await chrome.tabs.create({ url: "chrome://extensions/shortcuts" });
+    await extensionApi.tabs.create({ url: "chrome://extensions/shortcuts" });
   }
 });
 
@@ -2109,7 +2111,7 @@ document.addEventListener("keydown", (event) => {
   if (event.key === "Escape" && !nodes.searchPanel.hidden) { event.preventDefault(); closeSearch(); return; }
   if (event.key === "/" && !event.target.matches("input, textarea")) { event.preventDefault(); openSearch(); }
 });
-chrome.storage.onChanged.addListener((changes) => {
+extensionApi.storage.onChanged.addListener((changes) => {
   const change = changes[TABORA_STORAGE_KEY];
   if (!change?.newValue) return;
   const nextState = normalizeState(change.newValue);

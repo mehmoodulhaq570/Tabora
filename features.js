@@ -1,3 +1,5 @@
+var extensionApi = globalThis.browser ?? globalThis.chrome;
+
 const featureNodes = {
   dialog: document.querySelector("#featureDialog"),
   recent: document.querySelector("#recentActivity"),
@@ -83,7 +85,7 @@ function renderRecentActivity() {
   for (const item of appState.recentlyOpened.slice(0, 20)) {
     featureNodes.recent.append(featureRow(item.title, `${item.pageName} / ${item.boardName} · ${formatFeatureTime(item.openedAt)}`, [{
       label: "Open",
-      run: async () => chrome.tabs.create({ url: item.url })
+      run: async () => extensionApi.tabs.create({ url: item.url })
     }]));
   }
 }
@@ -380,7 +382,7 @@ document.querySelector("#featureUndo").addEventListener("click", async () => {
 
 document.querySelector("#checkLinks").addEventListener("click", async () => {
   try {
-    const granted = await chrome.permissions.request({ origins: ["http://*/*", "https://*/*"] });
+    const granted = await extensionApi.permissions.request({ origins: ["http://*/*", "https://*/*"] });
     if (!granted) {
       showToast("Site access is required to check bookmark health", "warning");
       return;
@@ -413,7 +415,7 @@ document.querySelector("#vaultForm").addEventListener("submit", async (event) =>
   if (!page || password.length < 8) return;
   const boards = appState.boards.filter((board) => board.pageId === pageId);
   const encrypted = await encryptWithPassword({ page, boards }, password);
-  await chrome.storage.local.remove(TABORA_UNDO_KEY);
+  await extensionApi.storage.local.remove(TABORA_UNDO_KEY);
   await updateTaboraState((state) => {
     state.vaults.push({ id: makeId("vault"), createdAt: Date.now(), ...encrypted });
     state.pages = state.pages.filter((item) => item.id !== pageId);

@@ -1,13 +1,14 @@
-/* global chrome, importScripts, normalizeUrl, getTaboraState, findDuplicateLink, addBoard, addLink */
+/* global extensionApi, importScripts, normalizeUrl, getTaboraState, findDuplicateLink, addBoard, addLink */
 
+var extensionApi = globalThis.browser ?? globalThis.chrome;
 const DEFAULT_ACTION_TITLE = "Tabora";
 
-importScripts("shared.js");
+if (typeof importScripts === "function") importScripts("shared.js");
 
 async function resetActionFeedback() {
   await Promise.all([
-    chrome.action.setBadgeText({ text: "" }),
-    chrome.action.setTitle({ title: DEFAULT_ACTION_TITLE })
+    extensionApi.action.setBadgeText({ text: "" }),
+    extensionApi.action.setTitle({ title: DEFAULT_ACTION_TITLE })
   ]);
 }
 
@@ -26,9 +27,9 @@ function resetActionFeedbackLater() {
 
 async function showActionFeedback(text, title, color) {
   await Promise.all([
-    chrome.action.setBadgeBackgroundColor({ color }),
-    chrome.action.setBadgeText({ text }),
-    chrome.action.setTitle({ title })
+    extensionApi.action.setBadgeBackgroundColor({ color }),
+    extensionApi.action.setBadgeText({ text }),
+    extensionApi.action.setTitle({ title })
   ]);
   resetActionFeedbackLater();
 }
@@ -36,7 +37,7 @@ async function showActionFeedback(text, title, color) {
 async function handleQuickSave(command) {
   if (command !== "quick-save") return;
 
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  const [tab] = await extensionApi.tabs.query({ active: true, currentWindow: true });
   if (!tab || !normalizeUrl(tab.url)) return;
 
   const state = await getTaboraState();
@@ -59,7 +60,7 @@ async function handleQuickSave(command) {
   }
 }
 
-chrome.commands.onCommand.addListener((command) => {
+extensionApi.commands.onCommand.addListener((command) => {
   void handleQuickSave(command).catch(async (error) => {
     console.error("Tabora quick save failed", error);
     try {

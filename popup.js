@@ -1,3 +1,5 @@
+var extensionApi = globalThis.browser ?? globalThis.chrome;
+
 const captureName = document.querySelector("#captureName");
 const capturePage = document.querySelector("#capturePage");
 const targetBoard = document.querySelector("#targetBoard");
@@ -53,7 +55,7 @@ async function applyPopupAppearance() {
     popupWallpaperUrl = "";
   }
 
-  let image = appearance?.[1] ? chrome.runtime.getURL(appearance[1]) : "";
+  let image = appearance?.[1] ? extensionApi.runtime.getURL(appearance[1]) : "";
   if (wallpaper.startsWith("custom")) {
     try {
       const blob = await getWallpaperBlob(wallpaper);
@@ -124,7 +126,7 @@ document.querySelector("#saveWindow").addEventListener("click", async () => {
 });
 
 document.querySelector("#addCurrentTab").addEventListener("click", async () => {
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  const [tab] = await extensionApi.tabs.query({ active: true, currentWindow: true });
   if (!tab || !normalizeUrl(tab.url) || !targetBoard.value) return;
   const added = await addLink(targetBoard.value, { title: tab.title, url: tab.url, favIconUrl: tab.favIconUrl || "" });
   if (added.result?.duplicate) {
@@ -136,7 +138,7 @@ document.querySelector("#addCurrentTab").addEventListener("click", async () => {
 });
 
 document.querySelector("#openDashboard").addEventListener("click", () => {
-  chrome.tabs.create({ url: chrome.runtime.getURL("dashboard.html") });
+  extensionApi.tabs.create({ url: extensionApi.runtime.getURL("dashboard.html") });
 });
 
 recentBoards.addEventListener("click", async (event) => {
@@ -147,7 +149,7 @@ recentBoards.addEventListener("click", async (event) => {
 });
 
 popupSearch.addEventListener("input", renderRecentBoards);
-chrome.storage.onChanged.addListener((changes) => {
+extensionApi.storage.onChanged.addListener((changes) => {
   if (!changes[TABORA_STORAGE_KEY]) return;
   void initPopup().catch((error) => console.error("Tabora popup could not refresh", error));
 });

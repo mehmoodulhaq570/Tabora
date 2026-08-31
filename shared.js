@@ -4,6 +4,7 @@ const TABORA_SCHEMA_VERSION = 4;
 const TABORA_BOARD_COLUMNS = 4;
 const TABORA_SHARE_FORMAT = "tabora-share";
 const TABORA_SHARE_VERSION = 1;
+var taboraApi = globalThis.browser ?? globalThis.chrome;
 
 function makeId(prefix) {
   return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -134,7 +135,7 @@ function migrateV1Data(sessions = [], workspaces = []) {
 }
 
 async function getTaboraState() {
-  const data = await chrome.storage.local.get([
+  const data = await taboraApi.storage.local.get([
     TABORA_STORAGE_KEY,
     "taboraSessions",
     "taboraWorkspaces"
@@ -143,7 +144,7 @@ async function getTaboraState() {
   if (data[TABORA_STORAGE_KEY]) return normalizeState(data[TABORA_STORAGE_KEY]);
 
   const state = migrateV1Data(data.taboraSessions || [], data.taboraWorkspaces || []);
-  await chrome.storage.local.set({
+  await taboraApi.storage.local.set({
     [TABORA_STORAGE_KEY]: state,
     taboraV1Backup: {
       sessions: data.taboraSessions || [],
@@ -157,18 +158,18 @@ async function getTaboraState() {
 
 async function saveTaboraState(state) {
   const normalized = normalizeState(state);
-  await chrome.storage.local.set({ [TABORA_STORAGE_KEY]: normalized });
+  await taboraApi.storage.local.set({ [TABORA_STORAGE_KEY]: normalized });
   return normalized;
 }
 
 async function saveUndoSnapshot(state, label = "Last change") {
   const snapshot = structuredClone(state);
   snapshot.settings.organizeMode = false;
-  await chrome.storage.local.set({ [TABORA_UNDO_KEY]: { label, state: snapshot, savedAt: Date.now() } });
+  await taboraApi.storage.local.set({ [TABORA_UNDO_KEY]: { label, state: snapshot, savedAt: Date.now() } });
 }
 
 async function getUndoSnapshot() {
-  const data = await chrome.storage.local.get(TABORA_UNDO_KEY);
+  const data = await taboraApi.storage.local.get(TABORA_UNDO_KEY);
   return data[TABORA_UNDO_KEY] || null;
 }
 
@@ -176,7 +177,7 @@ async function undoLastAction() {
   const snapshot = await getUndoSnapshot();
   if (!snapshot?.state) return null;
   await saveTaboraState(snapshot.state);
-  await chrome.storage.local.remove(TABORA_UNDO_KEY);
+  await taboraApi.storage.local.remove(TABORA_UNDO_KEY);
   return snapshot.label;
 }
 
@@ -674,7 +675,7 @@ async function setSetting(key, value) {
 }
 
 async function saveCurrentWindowAsBoard(pageId, name) {
-  const tabs = await chrome.tabs.query({ currentWindow: true });
+  const tabs = await taboraApi.tabs.query({ currentWindow: true });
   const savableTabs = tabs.filter((tab) => normalizeUrl(tab.url));
   const state = await getTaboraState();
   const existingUrls = new Set(state.boards.flatMap((board) => board.links.map((link) => normalizeUrl(link.url))));
@@ -692,7 +693,7 @@ async function saveCurrentWindowAsBoard(pageId, name) {
   const board = await addBoard(pageId, name || "Current Window", links);
   const latestState = await getTaboraState();
   if (latestState.settings.closeTabsAfterSaveAll && uniqueTabs.length) {
-    await chrome.tabs.remove(uniqueTabs.map((tab) => tab.id));
+    await taboraApi.tabs.remove(uniqueTabs.map((tab) => tab.id));
   }
   return { board: board.result, duplicateCount };
 }
@@ -701,11 +702,11 @@ async function openLinks(links, incognito = false) {
   const urls = links.map((link) => normalizeUrl(link.url)).filter(Boolean);
   if (!urls.length) return;
   if (incognito) {
-    await chrome.windows.create({ url: urls, incognito: true, focused: true });
+    await taboraApi.windows.create({ url: urls, incognito: true, focused: true });
     return;
   }
   for (const [index, url] of urls.entries()) {
-    await chrome.tabs.create({ url, active: index === 0 });
+    await taboraApi.tabs.create({ url, active: index === 0 });
   }
 }
 

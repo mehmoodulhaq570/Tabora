@@ -12,6 +12,14 @@
   "permissions": ["tabs", "storage", "clipboardWrite"],
   "optional_permissions": ["bookmarks"],
   "optional_host_permissions": ["http://*/*", "https://*/*"],
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "tabora@lumilist.local",
+      "data_collection_permissions": {
+        "required": ["none"]
+      }
+    }
+  },
   "chrome_url_overrides": {
     "newtab": "dashboard.html"
   },
@@ -26,6 +34,7 @@
     }
   },
   "background": {
+    "scripts": ["shared.js", "background.js"],
     "service_worker": "background.js"
   },
   "commands": {

@@ -97,6 +97,10 @@ The optional broken-link checker and link-detail fetching send standard HTTP req
 
 **Regions:** All regions
 
+### Browser Compatibility
+
+Tabora's Manifest V3 package is compatible with Chrome, Microsoft Edge, Brave, Opera, and Vivaldi. It includes both the Chromium service-worker and Firefox MV3 background-script declarations. The same manifest also contains Firefox signing metadata; Firefox distribution requires AMO signing and its required data-collection declaration, which states that Tabora does not transmit collected data. Safari requires conversion to a Safari Web Extension in Xcode. See `BROWSER_SUPPORT.md` for packaging and testing steps.
+
 ## Developer Info
 
 **Publisher Name:** TODO before submission
@@ -111,6 +115,7 @@ The optional broken-link checker and link-detail fetching send standard HTTP req
 
 | Version | Date | Changes | Status |
 |---------|------|---------|--------|
+| Next release | 2026-08-31 | Added Chromium and Firefox MV3 compatibility plus browser-specific distribution guidance; no new permissions or data transmission | Draft |
 | Next release | 2026-08-31 | Added portable `.tabora` files for exporting and importing individual boards and pages locally | Draft |
 | Next release | 2026-08-31 | Added six premium dark and light wallpaper presets with matching glass UI palettes | Draft |
 | Next release | 2026-08-31 | Added optimized Tabora icon assets for the Chrome toolbar, extension manager, and store listing | Draft |
