@@ -1,0 +1,47 @@
+{
+  "format": "tabora-share",
+  "version": 1,
+  "type": "page",
+  "exportedAt": "2026-08-31T12:00:00.000Z",
+  "page": {
+    "name": "Tabora Import Test"
+  },
+  "boards": [
+    {
+      "name": "Welcome Board",
+      "color": "violet",
+      "icon": "spark",
+      "size": "medium",
+      "pinned": true,
+      "column": 0,
+      "columnOrder": 0,
+      "links": [
+        {
+          "title": "Example Website",
+          "url": "https://example.com/",
+          "favIconUrl": "",
+          "note": "A test link included in the shared Tabora file.",
+          "order": 0
+        }
+      ]
+    },
+    {
+      "name": "Reference Links",
+      "color": "blue",
+      "icon": "book",
+      "size": "small",
+      "pinned": false,
+      "column": 1,
+      "columnOrder": 0,
+      "links": [
+        {
+          "title": "MDN Web Docs",
+          "url": "https://developer.mozilla.org/",
+          "favIconUrl": "",
+          "note": "Second test link to confirm multiple boards import.",
+          "order": 0
+        }
+      ]
+    }
+  ]
+}
