@@ -114,6 +114,9 @@ const WALLPAPERS = [
   { id: "eclipse-forge", name: "Eclipse Forge", theme: "dark", palette: "eclipse", image: "assets/eclipse-forge.webp" },
   { id: "abyss-bloom", name: "Abyss Bloom", theme: "dark", palette: "abyss", image: "assets/abyss-bloom.webp" },
   { id: "neon-monsoon", name: "Neon Monsoon", theme: "dark", palette: "monsoon", image: "assets/neon-monsoon.webp" },
+  { id: "ember-crown", name: "Ember Crown", theme: "dark", palette: "ember", image: "assets/ember-crown.webp", thumbnail: "assets/wallpaper-thumbs/ember-crown.webp" },
+  { id: "cobalt-tide", name: "Cobalt Tide", theme: "dark", palette: "cobalt", image: "assets/cobalt-tide.webp", thumbnail: "assets/wallpaper-thumbs/cobalt-tide.webp" },
+  { id: "verdant-vault", name: "Verdant Vault", theme: "dark", palette: "verdant", image: "assets/verdant-vault.webp", thumbnail: "assets/wallpaper-thumbs/verdant-vault.webp" },
   { id: "none", name: "Default", theme: "light", palette: "light-default", image: "" },
   { id: "mist-valley", name: "Mist Valley", theme: "light", palette: "mist", image: "assets/mist-valley.webp", thumbnail: "assets/wallpaper-thumbs/mist-valley.webp" },
   { id: "amber-voyager", name: "Amber Voyager", theme: "light", palette: "amber", image: "assets/amber-voyager.webp", thumbnail: "assets/wallpaper-thumbs/amber-voyager.webp" },
@@ -121,7 +124,10 @@ const WALLPAPERS = [
   { id: "coral-coast", name: "Coral Coast", theme: "light", palette: "coast", image: "assets/coral-coast.webp" },
   { id: "glass-horizon", name: "Glass Horizon", theme: "light", palette: "glass", image: "assets/glass-horizon.webp" },
   { id: "sakura-drift", name: "Sakura Drift", theme: "light", palette: "sakura", image: "assets/sakura-drift.webp" },
-  { id: "arctic-prism", name: "Arctic Prism", theme: "light", palette: "arctic", image: "assets/arctic-prism.webp" }
+  { id: "arctic-prism", name: "Arctic Prism", theme: "light", palette: "arctic", image: "assets/arctic-prism.webp" },
+  { id: "soleil-courtyard", name: "Soleil Courtyard", theme: "light", palette: "soleil", image: "assets/soleil-courtyard.webp", thumbnail: "assets/wallpaper-thumbs/soleil-courtyard.webp" },
+  { id: "petal-mist", name: "Petal Mist", theme: "light", palette: "petal", image: "assets/petal-mist.webp", thumbnail: "assets/wallpaper-thumbs/petal-mist.webp" },
+  { id: "glacier-house", name: "Glacier House", theme: "light", palette: "glacier", image: "assets/glacier-house.webp", thumbnail: "assets/wallpaper-thumbs/glacier-house.webp" }
 ];
 
 const PAGE_MENU_ICONS = {
