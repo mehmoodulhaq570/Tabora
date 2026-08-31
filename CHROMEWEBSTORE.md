@@ -49,6 +49,7 @@ English
 - Show the new-tab dashboard with several populated boards.
 - Show the toolbar popup saving a tab to a board.
 - Show the light theme, wallpaper selector, and workspace tools.
+- Refresh the dashboard screenshot after the guided first-time tour is finalized.
 
 ## Permissions Justification
 
@@ -108,6 +109,7 @@ The optional broken-link checker sends standard HTTP requests directly from the 
 
 | Version | Date | Changes | Status |
 |---------|------|---------|--------|
+| Next release | 2026-08-31 | Added a persistent, accessible first-time walkthrough for creating boards, saving links, and searching the workspace | Draft |
 | 3.0.2 | 2026-08-31 | Removed an unnecessary background permission and hardened service-worker startup across Chromium browsers | Draft |
 | 3.0.1 | 2026-08-31 | MV3 reliability, optional site access, accessibility, consistent local typography, and theme-aware toolbar popup styling | Draft |
 

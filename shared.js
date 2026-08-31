@@ -33,6 +33,7 @@ function createDefaultState() {
       quickSaveDestination: "current-page",
       language: "en",
       activeMoodId: "",
+      onboardingStep: 0,
       onboardingComplete: false
     }
   };
@@ -286,7 +287,6 @@ async function addBoard(pageId, name, links = [], placement = null) {
       })).filter((link) => link.url)
     };
     state.boards.push(board);
-    state.settings.onboardingComplete = true;
     return board;
   });
 }

@@ -85,6 +85,42 @@ async function waitForTargets() {
   assert.equal(manifest.host_permissions, undefined);
   assert.deepEqual(manifest.optional_host_permissions, ["http://*/*", "https://*/*"]);
 
+  const tour = await client.evaluate(`(async () => {
+    await updateTaboraState((state) => {
+      state.boards = [];
+      state.settings.onboardingComplete = false;
+      state.settings.onboardingStep = 0;
+    });
+    await refresh();
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    const card = document.querySelector("#onboardingCard");
+    const initial = {
+      open: card.matches(":popover-open"),
+      role: card.getAttribute("role"),
+      title: document.querySelector("#onboardingTitle").textContent,
+      disabled: document.querySelector("#onboardingNext").disabled
+    };
+    document.querySelector("#onboardingAction").click();
+    const editorOpened = Boolean(document.querySelector(".inline-board-form"));
+    document.querySelector(".inline-board-form")?.remove();
+    await addBoard("home", "Tour board");
+    await refresh();
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    const afterBoard = document.querySelector("#onboardingTitle").textContent;
+    document.querySelector("#skipOnboarding").click();
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    const state = await getTaboraState();
+    return { initial, editorOpened, afterBoard, complete: state.settings.onboardingComplete, closed: !card.matches(":popover-open") };
+  })()`);
+  assert.equal(tour.initial.open, true);
+  assert.equal(tour.initial.role, "dialog");
+  assert.equal(tour.initial.title, "Create your first board");
+  assert.equal(tour.initial.disabled, true);
+  assert.equal(tour.editorOpened, true);
+  assert.equal(tour.afterBoard, "Save a useful link");
+  assert.equal(tour.complete, true);
+  assert.equal(tour.closed, true);
+
   const accessibility = await client.evaluate(`(() => {
     const dialogs = [...document.querySelectorAll("dialog")];
     const namedDialogs = dialogs.every((dialog) => {

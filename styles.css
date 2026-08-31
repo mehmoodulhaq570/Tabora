@@ -763,9 +763,23 @@ textarea.dark-input { min-height: 92px; padding-top: 10px; resize: vertical; }
 .custom-wallpaper-action.danger:hover { border-color: var(--danger); color: var(--danger); }
 .custom-wallpaper-action svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.8; }
 
-.onboarding-card { position: fixed; left: max(24px, calc((100vw - min(1320px, calc(100vw - 148px))) / 2)); bottom: 28px; z-index: 35; width: min(390px, calc(100% - 48px)); padding: 16px; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--appearance-bg); box-shadow: var(--shadow); }
-.onboarding-card p { margin: 7px 0 13px; color: var(--muted); font-size: var(--text-xs); }
-.onboarding-card .secondary-button { float: right; }
+.onboarding-card { position: fixed; inset: auto; z-index: 90; width: min(360px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); margin: 0; padding: 18px; overflow: auto; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--appearance-bg); box-shadow: 0 18px 48px rgba(0, 0, 0, 0.34); color: var(--text); }
+.onboarding-card:not(.is-open) { display: none; }
+.onboarding-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.onboarding-progress-label { margin: 0 0 5px; color: var(--green); font-size: var(--text-xs); font-weight: 700; }
+.onboarding-card h2 { margin: 0; font-size: var(--text-lg); line-height: 1.25; }
+.onboarding-card > p { margin: 10px 0 16px; color: var(--muted); font-size: var(--text-sm); line-height: 1.45; }
+.onboarding-close { display: grid; width: 32px; height: 32px; padding: 0; flex: 0 0 auto; place-items: center; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--muted); cursor: pointer; }
+.onboarding-close:hover { border-color: var(--line); background: var(--surface-raised); color: var(--text); }
+.onboarding-close svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 2; }
+.onboarding-steps { display: flex; gap: 6px; margin-bottom: 18px; }
+.onboarding-steps i { display: block; width: 24px; height: 3px; border-radius: 999px; background: var(--line); }
+.onboarding-steps i.active { background: var(--green); }
+.onboarding-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.onboarding-actions button { min-height: 38px; }
+.tour-target { position: relative; outline: 2px solid var(--green); outline-offset: 4px; box-shadow: 0 0 0 6px color-mix(in srgb, var(--green) 14%, transparent), 0 0 28px color-mix(in srgb, var(--green) 34%, transparent); }
+@media (prefers-reduced-motion: no-preference) { .tour-target { animation: tour-target-pulse 1.8s ease-in-out infinite; } }
+@keyframes tour-target-pulse { 50% { box-shadow: 0 0 0 9px color-mix(in srgb, var(--green) 8%, transparent), 0 0 32px color-mix(in srgb, var(--green) 42%, transparent); } }
 .organize-toolbar { position: fixed; right: 50%; bottom: 18px; z-index: 70; display: flex; width: max-content; max-width: calc(100% - 48px); min-height: 64px; padding: 10px 18px 10px 24px; align-items: center; gap: 18px; border: 1px solid var(--line-strong); border-radius: 14px; background: var(--appearance-bg); color: var(--muted); box-shadow: 0 18px 48px rgba(0, 0, 0, 0.34); backdrop-filter: blur(18px); transform: translateX(50%); }
 .organize-toolbar[hidden] { display: none; }
 .organize-hint { flex: 0 0 auto; font-size: var(--text-sm); }
@@ -1148,7 +1162,7 @@ body[data-palette="arctic"] {
   .tool-rail { top: auto; right: 12px; bottom: 12px; left: 12px; grid-template-columns: repeat(8, 44px); justify-content: center; gap: 6px; transform: none; }
   .rail-button { width: 44px; height: 44px; }
   .wallpaper-button { display: none; }
-  .onboarding-card { bottom: 72px; }
+  .onboarding-card { width: min(360px, calc(100vw - 24px)); }
   .appearance-panel { left: 16px; bottom: 70px; width: min(414px, calc(100% - 32px)); height: min(566px, calc(100vh - 94px)); }
   .settings-dialog { width: calc(100% - 24px); height: calc(100vh - 24px); }
   .settings-layout { grid-template-columns: 190px minmax(0, 1fr); }

@@ -35,6 +35,12 @@ const nodes = {
   appearancePanel: document.querySelector("#appearancePanel"),
   settingsDialog: document.querySelector("#settingsDialog"),
   onboardingCard: document.querySelector("#onboardingCard"),
+  onboardingProgress: document.querySelector("#onboardingProgress"),
+  onboardingTitle: document.querySelector("#onboardingTitle"),
+  onboardingDescription: document.querySelector("#onboardingDescription"),
+  onboardingBack: document.querySelector("#onboardingBack"),
+  onboardingAction: document.querySelector("#onboardingAction"),
+  onboardingNext: document.querySelector("#onboardingNext"),
   toast: document.querySelector("#toast")
 };
 
@@ -61,6 +67,36 @@ let pendingRefreshAppearance = false;
 let pendingRefreshMessage = "";
 let pendingRefreshWaiters = [];
 const boardCardCache = new Map();
+let highlightedTourTarget = null;
+let onboardingHasOpened = false;
+let onboardingPositionFrame = null;
+
+const ONBOARDING_STEPS = [
+  {
+    title: "Create your first board",
+    description: "Boards keep related links together. Start by creating one for a project, topic, or routine.",
+    target: () => nodes.boardGrid.querySelector("[data-add-board]"),
+    actionLabel: "Create board",
+    action: () => nodes.boardGrid.querySelector("[data-add-board]")?.click(),
+    nextLabel: "Continue"
+  },
+  {
+    title: "Save a useful link",
+    description: "Use the link button on a board to save a website, note, or resource where you can find it again.",
+    target: () => nodes.boardGrid.querySelector("[data-add-link]"),
+    actionLabel: "Add link",
+    action: () => nodes.boardGrid.querySelector("[data-add-link]")?.click(),
+    nextLabel: "Continue"
+  },
+  {
+    title: "Find anything quickly",
+    description: "Search looks through board names, saved links, addresses, and notes from anywhere in your workspace.",
+    target: () => searchTool,
+    actionLabel: "Open search",
+    action: () => openSearch(),
+    nextLabel: "Finish"
+  }
+];
 
 const ORGANIZE_TOOL_ICON = '<svg class="rail-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="6" height="6" rx="1"></rect><rect x="14" y="3" width="6" height="6" rx="1"></rect><rect x="3" y="14" width="6" height="6" rx="1"></rect><path d="m13.5 17 2.2 2.2 4.8-5"></path></svg>';
 const ORGANIZE_DONE_ICON = '<svg class="rail-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4.5 4.5L19 7"></path></svg>';
@@ -322,7 +358,115 @@ function renderOrganizeToolbar() {
 }
 
 function renderOnboarding() {
-  nodes.onboardingCard.hidden = appState.settings.onboardingComplete || appState.boards.length > 0;
+  if (appState.settings.onboardingComplete) {
+    hideOnboardingCard();
+    return;
+  }
+
+  let stepIndex = Math.max(0, Math.min(ONBOARDING_STEPS.length - 1, Number(appState.settings.onboardingStep) || 0));
+  if (stepIndex === 0 && appState.boards.length) {
+    stepIndex = 1;
+    void setOnboardingStep(stepIndex);
+  } else if (stepIndex === 1 && !appState.boards.length) {
+    stepIndex = 0;
+    void setOnboardingStep(stepIndex);
+  }
+  const step = ONBOARDING_STEPS[stepIndex];
+  const target = step.target();
+  const needsBoard = stepIndex === 0 && appState.boards.length === 0;
+
+  clearOnboardingTarget();
+  if (target) {
+    target.classList.add("tour-target");
+    highlightedTourTarget = target;
+  }
+
+  nodes.onboardingProgress.textContent = `Step ${stepIndex + 1} of ${ONBOARDING_STEPS.length}`;
+  nodes.onboardingTitle.textContent = step.title;
+  nodes.onboardingDescription.textContent = step.description;
+  nodes.onboardingBack.hidden = stepIndex === 0;
+  nodes.onboardingAction.hidden = !target;
+  nodes.onboardingAction.textContent = step.actionLabel;
+  nodes.onboardingNext.textContent = step.nextLabel;
+  nodes.onboardingNext.disabled = needsBoard;
+  nodes.onboardingNext.title = needsBoard ? "Create a board to continue" : "";
+  document.querySelectorAll(".onboarding-steps i").forEach((item, index) => item.classList.toggle("active", index <= stepIndex));
+
+  nodes.onboardingCard.classList.add("is-open");
+  if (typeof nodes.onboardingCard.showPopover === "function" && !nodes.onboardingCard.matches(":popover-open")) {
+    nodes.onboardingCard.showPopover();
+  }
+  requestAnimationFrame(() => {
+    positionOnboardingCard(target);
+    if (!onboardingHasOpened) {
+      onboardingHasOpened = true;
+      (nodes.onboardingNext.disabled ? nodes.onboardingAction : nodes.onboardingNext).focus({ preventScroll: true });
+    }
+  });
+}
+
+function clearOnboardingTarget() {
+  highlightedTourTarget?.classList.remove("tour-target");
+  highlightedTourTarget = null;
+}
+
+function hideOnboardingCard() {
+  clearOnboardingTarget();
+  if (onboardingPositionFrame) cancelAnimationFrame(onboardingPositionFrame);
+  onboardingPositionFrame = null;
+  if (typeof nodes.onboardingCard.hidePopover === "function" && nodes.onboardingCard.matches(":popover-open")) {
+    nodes.onboardingCard.hidePopover();
+  }
+  nodes.onboardingCard.classList.remove("is-open");
+  nodes.onboardingCard.style.left = "";
+  nodes.onboardingCard.style.top = "";
+}
+
+function positionOnboardingCard(target = highlightedTourTarget) {
+  if (!nodes.onboardingCard.classList.contains("is-open")) return;
+  const card = nodes.onboardingCard;
+  const padding = 16;
+  const cardRect = card.getBoundingClientRect();
+  const width = cardRect.width;
+  const height = cardRect.height;
+  let left = Math.max(padding, (window.innerWidth - width) / 2);
+  let top = Math.max(padding, window.innerHeight - height - 28);
+
+  if (target?.isConnected) {
+    const targetRect = target.getBoundingClientRect();
+    left = targetRect.right + 16;
+    if (left + width > window.innerWidth - padding) left = targetRect.left - width - 16;
+    if (left < padding || left + width > window.innerWidth - padding) {
+      left = Math.max(padding, Math.min(window.innerWidth - width - padding, targetRect.left));
+      top = targetRect.bottom + 16;
+    } else {
+      top = targetRect.top;
+    }
+    top = Math.max(padding, Math.min(window.innerHeight - height - padding, top));
+  }
+
+  card.style.left = `${Math.round(left)}px`;
+  card.style.top = `${Math.round(top)}px`;
+}
+
+function scheduleOnboardingPosition() {
+  if (!nodes.onboardingCard.classList.contains("is-open")) return;
+  if (onboardingPositionFrame) cancelAnimationFrame(onboardingPositionFrame);
+  onboardingPositionFrame = requestAnimationFrame(() => {
+    onboardingPositionFrame = null;
+    positionOnboardingCard();
+  });
+}
+
+async function setOnboardingStep(stepIndex) {
+  await setSetting("onboardingStep", Math.max(0, Math.min(ONBOARDING_STEPS.length - 1, stepIndex)));
+  await refresh();
+}
+
+async function completeOnboarding() {
+  await setSetting("onboardingComplete", true);
+  await setSetting("onboardingStep", ONBOARDING_STEPS.length - 1);
+  await refresh();
 }
 
 function showToast(message, tone = "") {
@@ -1803,7 +1947,27 @@ async function applyAppearance() {
   appliedAppearanceKey = appearanceKey;
 }
 
-document.querySelector("#skipOnboarding").addEventListener("click", async () => { await setSetting("onboardingComplete", true); await refresh(); });
+document.querySelector("#skipOnboarding").addEventListener("click", () => { void completeOnboarding(); });
+nodes.onboardingBack.addEventListener("click", () => {
+  void setOnboardingStep((Number(appState.settings.onboardingStep) || 0) - 1);
+});
+nodes.onboardingAction.addEventListener("click", () => {
+  const stepIndex = Math.max(0, Math.min(ONBOARDING_STEPS.length - 1, Number(appState.settings.onboardingStep) || 0));
+  ONBOARDING_STEPS[stepIndex].action();
+});
+nodes.onboardingNext.addEventListener("click", () => {
+  const stepIndex = Math.max(0, Math.min(ONBOARDING_STEPS.length - 1, Number(appState.settings.onboardingStep) || 0));
+  if (stepIndex === ONBOARDING_STEPS.length - 1) {
+    void completeOnboarding();
+    return;
+  }
+  void setOnboardingStep(stepIndex + 1);
+});
+nodes.onboardingCard.addEventListener("toggle", (event) => {
+  if (event.newState === "closed") nodes.onboardingCard.classList.remove("is-open");
+});
+window.addEventListener("resize", scheduleOnboardingPosition);
+window.addEventListener("scroll", scheduleOnboardingPosition, { passive: true });
 document.addEventListener("click", (event) => {
   if (!event.target.closest("#contextMenu") && !event.target.closest("[data-board-menu]") && !event.target.closest("[data-page-options]")) hideContextMenu();
   if (!event.target.closest("#appearancePanel") && !event.target.closest("#wallpaperTool")) closeAppearancePanel();
@@ -1812,6 +1976,7 @@ document.addEventListener("click", (event) => {
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape" && !nodes.contextMenu.hidden) { event.preventDefault(); hideContextMenu({ restoreFocus: true }); return; }
   if (event.key === "Escape" && !nodes.searchPanel.hidden) { event.preventDefault(); closeSearch(); return; }
+  if (event.key === "Escape" && nodes.onboardingCard.classList.contains("is-open")) { event.preventDefault(); void completeOnboarding(); return; }
   if (event.key === "/" && !event.target.matches("input, textarea")) { event.preventDefault(); openSearch(); }
 });
 chrome.storage.onChanged.addListener((changes) => {
