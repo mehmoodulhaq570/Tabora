@@ -4,6 +4,8 @@ const fs = require("node:fs");
 const port = Number(process.env.TABORA_DEBUG_PORT || 9333);
 const screenshotPath = process.env.TABORA_SCREENSHOT || "";
 const searchScreenshotPath = process.env.TABORA_SEARCH_SCREENSHOT || "";
+const lightMenuScreenshotPath = process.env.TABORA_LIGHT_MENU_SCREENSHOT || "";
+const lightDialogScreenshotPath = process.env.TABORA_LIGHT_DIALOG_SCREENSHOT || "";
 
 class CdpClient {
   constructor(url) {
@@ -113,6 +115,8 @@ async function waitForTargets() {
   const themes = await client.evaluate(`(async () => {
     document.querySelector("#wallpaperTool").click();
     await new Promise((resolve) => setTimeout(resolve, 250));
+    document.querySelector('#appearancePanel [data-theme="dark"]').click();
+    await new Promise((resolve) => setTimeout(resolve, 300));
     const count = document.querySelectorAll("#wallpaperGrid [data-wallpaper]").length;
     document.querySelector('[data-wallpaper="eclipse-forge"]').click();
     await new Promise((resolve) => setTimeout(resolve, 300));
@@ -137,6 +141,51 @@ async function waitForTargets() {
   assert.match(themes.darkImage, /eclipse-forge\.webp/);
   assert.equal(themes.lightPalette, "sakura");
   assert.match(themes.lightImage, /sakura-drift\.webp/);
+
+  const lightSurfaces = await client.evaluate(`(async () => {
+    const luminance = (value) => {
+      const channels = value.match(/[\\d.]+/g).slice(0, 3).map(Number);
+      const scale = Math.max(...channels) <= 1 ? 255 : 1;
+      return (channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722) * scale;
+    };
+    document.querySelector("#appearancePanel").hidden = true;
+    document.querySelector("[data-page-options]").click();
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    const menu = document.querySelector("#contextMenu");
+    const menuButton = menu.querySelector("button");
+    const result = {
+      menuBackground: luminance(getComputedStyle(menu).backgroundColor),
+      menuText: luminance(getComputedStyle(menuButton).color)
+    };
+    document.querySelector("#addPageButton").click();
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    const dialog = document.querySelector("#pageDialog");
+    const input = document.querySelector("#pageName");
+    result.dialogOpen = dialog.open;
+    result.dialogBackground = luminance(getComputedStyle(dialog).backgroundColor);
+    result.inputBackground = luminance(getComputedStyle(input).backgroundColor);
+    result.inputText = luminance(getComputedStyle(input).color);
+    dialog.close();
+    return result;
+  })()`);
+  assert.ok(lightSurfaces.menuBackground > 180 && lightSurfaces.menuText < 120);
+  assert.equal(lightSurfaces.dialogOpen, true);
+  assert.ok(lightSurfaces.dialogBackground > 180);
+  assert.ok(lightSurfaces.inputBackground > 180 && lightSurfaces.inputText < 120);
+
+  if (lightMenuScreenshotPath) {
+    await client.evaluate(`document.querySelector("[data-page-options]").click()`);
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    const screenshot = await client.send("Page.captureScreenshot", { format: "png", captureBeyondViewport: false });
+    fs.writeFileSync(lightMenuScreenshotPath, Buffer.from(screenshot.data, "base64"));
+  }
+  if (lightDialogScreenshotPath) {
+    await client.evaluate(`document.querySelector("#addPageButton").click()`);
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    const screenshot = await client.send("Page.captureScreenshot", { format: "png", captureBeyondViewport: false });
+    fs.writeFileSync(lightDialogScreenshotPath, Buffer.from(screenshot.data, "base64"));
+    await client.evaluate(`document.querySelector("#pageDialog").close()`);
+  }
 
   const hub = await client.evaluate(`(async () => {
     document.querySelector("#appearancePanel").hidden = true;
