@@ -419,6 +419,7 @@ async function updateLink(boardId, linkId, values) {
     if (url) link.url = url;
     link.title = cleanName(values.title, link.title);
     link.note = String(values.note || "").trim().slice(0, 2000);
+    if (Object.hasOwn(values, "favIconUrl")) link.favIconUrl = values.favIconUrl || "";
   });
 }
 

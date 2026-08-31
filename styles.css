@@ -251,6 +251,12 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 textarea.dark-input { min-height: 92px; padding-top: 10px; resize: vertical; }
 .dark-input::placeholder { color: var(--muted); opacity: 0.82; }
 .dark-input:focus { border-color: var(--green); box-shadow: 0 0 0 3px color-mix(in srgb, var(--green) 14%, transparent); }
+.link-url-actions { display: flex; gap: 8px; }
+.link-url-actions .dark-input { min-width: 0; flex: 1 1 auto; }
+.link-url-actions .secondary-button { flex: 0 0 auto; min-height: 42px; }
+.link-url-actions svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 2; }
+.link-fetch-status { min-height: 18px; margin: -2px 0 4px; color: var(--muted); font-size: var(--text-xs); line-height: 1.35; }
+.link-fetch-status.is-warning { color: var(--danger); }
 
 .accent-button, .secondary-button, .danger-button {
   min-height: 40px;
@@ -1153,6 +1159,8 @@ body[data-palette="arctic"] {
   .tool-rail { top: auto; right: 12px; bottom: 12px; left: 12px; grid-template-columns: repeat(8, 44px); justify-content: center; gap: 6px; transform: none; }
   .rail-button { width: 44px; height: 44px; }
   .wallpaper-button { display: none; }
+  .link-url-actions { align-items: stretch; flex-direction: column; }
+  .link-url-actions .secondary-button { width: 100%; }
   .onboarding-card { align-items: flex-start; flex-direction: column; gap: 14px; }
   .onboarding-actions { width: 100%; }
   .onboarding-actions button { flex: 1 1 0; }

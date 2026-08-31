@@ -20,7 +20,7 @@ Create pages for different areas of your life, arrange links into customizable b
 
 Use the toolbar popup to save the current tab or window. Open a new tab to manage pages, boards, links, wallpapers, recent activity, private local vaults, and workspace tools.
 
-Tabora stores its workspace locally in the current browser profile. It does not require an account, sell user data, or send the saved workspace to Tabora servers. The optional link checker contacts saved websites only after the user grants site access and starts a check.
+Tabora stores its workspace locally in the current browser profile. It does not require an account, sell user data, or send the saved workspace to Tabora servers. The optional link checker and link-detail fetching contact a saved or user-entered website only after the user starts the relevant save or import action and allows optional site access in Chrome. Chrome remembers that choice for future actions.
 
 **Category**
 
@@ -59,7 +59,7 @@ English
 | `storage` | permissions | Stores pages, boards, links, settings, trash recovery data, and undo state locally in the browser profile. |
 | `clipboardWrite` | permissions | Copies a link, board, page, or encrypted temporary room package when the user chooses a share or copy action. |
 | `bookmarks` | optional_permissions | Imports browser bookmarks only after the user selects Browser bookmarks and approves access. |
-| `http://*/*`, `https://*/*` | optional_host_permissions | Checks saved links for availability and redirects only after the user starts Check Links and grants site access. |
+| `http://*/*`, `https://*/*` | optional_host_permissions | Checks saved links and fetches title, description, and favicon metadata during user-initiated link saves or imports only after the user allows one-time optional site access in Chrome. |
 
 ## Privacy & Data Use
 
@@ -77,7 +77,7 @@ English
 | User activity | Yes | No | Stores recently opened Tabora links and preferences locally | No |
 | Website content | Yes | No | Stores bookmark titles, notes, addresses, and optional metadata locally | No |
 
-The optional broken-link checker sends standard HTTP requests directly from the browser to the saved website being checked. Tabora does not operate an intermediary server and does not transmit the user's workspace to Tabora or analytics services.
+The optional broken-link checker and link-detail fetching send standard HTTP requests directly from the browser to the specific websites selected by the user. Tabora does not operate an intermediary server and does not transmit the user's workspace to Tabora or analytics services.
 
 ### Data Use Certification
 
@@ -109,6 +109,7 @@ The optional broken-link checker sends standard HTTP requests directly from the 
 
 | Version | Date | Changes | Status |
 |---------|------|---------|--------|
+| Next release | 2026-08-31 | Added automatic link metadata fetching during dashboard saves and imports with one-time optional site access | Draft |
 | Next release | 2026-08-31 | Added quiet in-layout welcome guidance for creating boards, saving links, and searching the workspace | Draft |
 | 3.0.2 | 2026-08-31 | Removed an unnecessary background permission and hardened service-worker startup across Chromium browsers | Draft |
 | 3.0.1 | 2026-08-31 | MV3 reliability, optional site access, accessibility, consistent local typography, and theme-aware toolbar popup styling | Draft |

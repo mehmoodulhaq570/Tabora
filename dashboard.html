@@ -84,7 +84,9 @@
       <form id="linkForm">
         <header class="dialog-header"><div><span class="eyebrow">Bookmark</span><h2 id="linkDialogTitle">Add link</h2></div><button class="dialog-close" type="button" data-close-dialog="linkDialog" aria-label="Close">&times;</button></header>
         <label for="linkTitle">Title</label><input id="linkTitle" class="dark-input" placeholder="Project documentation" maxlength="60">
-        <label for="linkUrl">URL</label><input id="linkUrl" class="dark-input" type="text" placeholder="https://example.com" required>
+        <label for="linkUrl">URL</label>
+        <div class="link-url-actions"><input id="linkUrl" class="dark-input" type="text" placeholder="https://example.com" aria-describedby="linkFetchStatus" required><button id="fetchLinkDetails" class="secondary-button" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 0 2 5.3"></path><path d="M20 4v7h-7"></path></svg>Fetch details</button></div>
+        <p id="linkFetchStatus" class="link-fetch-status" aria-live="polite" hidden></p>
         <label for="linkNote">Note <span>optional</span></label><textarea id="linkNote" class="dark-input" placeholder="Why this link matters" maxlength="2000"></textarea>
         <input id="linkBoardId" type="hidden"><input id="editingLinkId" type="hidden">
         <footer class="dialog-footer"><button class="secondary-button" type="button" data-close-dialog="linkDialog">Cancel</button><button class="accent-button" type="submit">Save link</button></footer>
@@ -121,7 +123,7 @@
         <div id="importPreview" class="import-preview" hidden>
           <div><span class="eyebrow">Ready to import</span><h3 id="importPreviewTitle"></h3><p id="importPreviewDetails"></p></div>
           <div id="importPreviewBoards" class="preview-board-list"></div>
-          <div class="dialog-footer"><button id="cancelImportPreview" class="secondary-button" type="button">Back</button><button id="commitImport" class="accent-button" type="button">Import now</button></div>
+          <div class="dialog-footer"><button id="cancelImportPreview" class="secondary-button" type="button">Back</button><button id="commitImport" class="accent-button" type="button">Import and fetch details</button></div>
         </div>
       </form>
     </dialog>

@@ -18,7 +18,7 @@ const chrome = {
 
 const context = vm.createContext({ chrome, console, structuredClone, URL, setTimeout, clearTimeout });
 const source = `${fs.readFileSync("shared.js", "utf8")}
-globalThis.tabora = { createDefaultState, getTaboraState, saveTaboraState, addBoard, addLink, customizeBoard, deleteBoard, undoLastAction };`;
+globalThis.tabora = { createDefaultState, getTaboraState, saveTaboraState, addBoard, addLink, updateLink, customizeBoard, deleteBoard, undoLastAction };`;
 vm.runInContext(source, context);
 
 (async () => {
@@ -44,6 +44,9 @@ vm.runInContext(source, context);
   assert.equal(duplicate.result.duplicate, true);
   state = await api.getTaboraState();
   assert.equal(state.boards[0].links.length, 1);
+  await api.updateLink(boardId, first.result.id, { title: "Example", url: "https://example.com", note: "", favIconUrl: "https://example.com/favicon.ico" });
+  state = await api.getTaboraState();
+  assert.equal(state.boards[0].links[0].favIconUrl, "https://example.com/favicon.ico");
 
   await api.deleteBoard(boardId);
   state = await api.getTaboraState();

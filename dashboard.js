@@ -23,6 +23,8 @@ const nodes = {
   linkTitle: document.querySelector("#linkTitle"),
   linkUrl: document.querySelector("#linkUrl"),
   linkNote: document.querySelector("#linkNote"),
+  fetchLinkDetails: document.querySelector("#fetchLinkDetails"),
+  linkFetchStatus: document.querySelector("#linkFetchStatus"),
   linkBoardId: document.querySelector("#linkBoardId"),
   editingLinkId: document.querySelector("#editingLinkId"),
   deleteConfirmDialog: document.querySelector("#deleteConfirmDialog"),
@@ -66,6 +68,7 @@ let pendingRefreshAppearance = false;
 let pendingRefreshMessage = "";
 let pendingRefreshWaiters = [];
 const boardCardCache = new Map();
+let dialogLinkMetadata = null;
 
 const ONBOARDING_STEPS = [
   {
@@ -459,6 +462,8 @@ function openLinkDialog(boardId, link = null) {
   nodes.linkTitle.value = link?.title || "";
   nodes.linkUrl.value = link?.url || "";
   nodes.linkNote.value = link?.note || "";
+  dialogLinkMetadata = link?.favIconUrl ? { favIconUrl: link.favIconUrl, url: link.url } : null;
+  setLinkFetchStatus("");
   document.querySelector("#linkDialogTitle").textContent = link ? "Edit link" : "Add link";
   nodes.linkDialog.showModal();
   (link ? nodes.linkTitle : nodes.linkUrl).focus();
@@ -471,7 +476,7 @@ function closeInlineLinkEditor() {
 }
 
 async function fetchLinkMetadata(url) {
-  const fallback = { title: getDomain(url), note: "", favIconUrl: "" };
+  const fallback = { title: getDomain(url), note: "", favIconUrl: "", fetched: false };
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 8000);
 
@@ -499,13 +504,74 @@ async function fetchLinkMetadata(url) {
     return {
       title: String(title || fallback.title).replace(/\s+/g, " ").trim(),
       note: String(note).replace(/\s+/g, " ").trim().slice(0, 2000),
-      favIconUrl
+      favIconUrl,
+      fetched: true
     };
   } catch {
     return fallback;
   } finally {
     clearTimeout(timeout);
   }
+}
+
+async function requestLinkMetadataAccess() {
+  if (!chrome.permissions?.request) return false;
+  const request = { origins: ["http://*/*", "https://*/*"] };
+  try {
+    if (chrome.permissions.contains && await chrome.permissions.contains(request)) return true;
+    return await chrome.permissions.request(request);
+  } catch {
+    return false;
+  }
+}
+
+async function mapWithConcurrency(items, limit, mapper) {
+  const results = new Array(items.length);
+  let nextIndex = 0;
+  async function worker() {
+    while (nextIndex < items.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      results[index] = await mapper(items[index]);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
+}
+
+async function enrichLinksWithMetadata(links) {
+  const validLinks = links.filter((link) => normalizeUrl(link.url));
+  if (!validLinks.length) return { links, fetchedCount: 0, accessGranted: true };
+  const accessGranted = await requestLinkMetadataAccess();
+  if (!accessGranted) return { links, fetchedCount: 0, accessGranted: false };
+
+  let fetchedCount = 0;
+  const enriched = await mapWithConcurrency(validLinks, 5, async (link) => {
+    const url = normalizeUrl(link.url);
+    const metadata = await fetchLinkMetadata(url);
+    if (!metadata.fetched) return { ...link, url };
+    fetchedCount += 1;
+    return {
+      ...link,
+      url,
+      title: link.title || metadata.title,
+      note: link.note || metadata.note,
+      favIconUrl: link.favIconUrl || metadata.favIconUrl
+    };
+  });
+
+  const metadataByUrl = new Map(enriched.map((link) => [normalizeUrl(link.url), link]));
+  return {
+    links: links.map((link) => metadataByUrl.get(normalizeUrl(link.url)) || link),
+    fetchedCount,
+    accessGranted: true
+  };
+}
+
+function setLinkFetchStatus(message, tone = "") {
+  nodes.linkFetchStatus.textContent = message;
+  nodes.linkFetchStatus.hidden = !message;
+  nodes.linkFetchStatus.classList.toggle("is-warning", tone === "warning");
 }
 
 function showInlineLinkDetails(editor, url, metadata) {
@@ -585,10 +651,11 @@ function openInlineLinkEditor(boardId) {
     const url = normalizeUrl(input.value);
     if (!url) { showToast("Enter a valid web address"); input.focus(); return; }
     editor.innerHTML = '<div class="inline-link-fetching" role="status"><span class="fetch-spinner" aria-hidden="true"></span><strong>Fetching title...</strong></div>';
-    const [metadata] = await Promise.all([
-      fetchLinkMetadata(url),
+    const [enriched] = await Promise.all([
+      enrichLinksWithMetadata([{ url: url, title: "", note: "", favIconUrl: "" }]),
       new Promise((resolve) => setTimeout(resolve, 420))
     ]);
+    const metadata = enriched.links[0] || { title: getDomain(url), note: "", favIconUrl: "" };
     showInlineLinkDetails(editor, url, metadata);
   });
   input.focus();
@@ -985,8 +1052,22 @@ nodes.boardForm.addEventListener("submit", async (event) => {
 
 nodes.linkForm.addEventListener("submit", async (event) => {
   event.preventDefault();
-  const values = { title: nodes.linkTitle.value, url: nodes.linkUrl.value, note: nodes.linkNote.value };
-  if (!normalizeUrl(values.url)) { showToast("Enter a valid web address"); return; }
+  let values = { title: nodes.linkTitle.value, url: nodes.linkUrl.value, note: nodes.linkNote.value };
+  const normalizedUrl = normalizeUrl(values.url);
+  if (!normalizedUrl) { showToast("Enter a valid web address"); return; }
+  values.url = normalizedUrl;
+  values.favIconUrl = dialogLinkMetadata?.url === normalizedUrl ? dialogLinkMetadata.favIconUrl : "";
+  if (!nodes.editingLinkId.value && !dialogLinkMetadata) {
+    nodes.fetchLinkDetails.disabled = true;
+    setLinkFetchStatus("Requesting access and fetching details...");
+    const enriched = await enrichLinksWithMetadata([values]);
+    values = enriched.links[0] || values;
+    dialogLinkMetadata = { favIconUrl: values.favIconUrl || "", url: normalizedUrl };
+    setLinkFetchStatus(enriched.accessGranted
+      ? enriched.fetchedCount ? "Details added. Saving link..." : "This site did not provide details. Saving link..."
+      : "Site access was not granted. Saving link without fetched details.", enriched.accessGranted ? "" : "warning");
+    nodes.fetchLinkDetails.disabled = false;
+  }
   const saved = nodes.editingLinkId.value
     ? await updateLink(nodes.linkBoardId.value, nodes.editingLinkId.value, values)
     : await addLink(nodes.linkBoardId.value, values);
@@ -996,6 +1077,34 @@ nodes.linkForm.addEventListener("submit", async (event) => {
   }
   nodes.linkDialog.close();
   await refresh(nodes.editingLinkId.value ? "Link updated" : "Link added");
+});
+
+nodes.linkUrl.addEventListener("input", () => {
+  const normalizedUrl = normalizeUrl(nodes.linkUrl.value);
+  if (dialogLinkMetadata && dialogLinkMetadata.url !== normalizedUrl) dialogLinkMetadata = null;
+});
+
+nodes.fetchLinkDetails.addEventListener("click", async () => {
+  const url = normalizeUrl(nodes.linkUrl.value);
+  if (!url) { setLinkFetchStatus("Enter a valid web address first.", "warning"); nodes.linkUrl.focus(); return; }
+
+  nodes.fetchLinkDetails.disabled = true;
+  setLinkFetchStatus("Allow site access in Chrome to fetch link details.");
+  const granted = await requestLinkMetadataAccess();
+  if (!granted) {
+    setLinkFetchStatus("Site access was not granted. You can still add the link manually.", "warning");
+    nodes.fetchLinkDetails.disabled = false;
+    return;
+  }
+
+  const metadata = await fetchLinkMetadata(url);
+  dialogLinkMetadata = { favIconUrl: metadata.favIconUrl, url };
+  if (metadata.fetched) {
+    if (metadata.title) nodes.linkTitle.value = metadata.title;
+    if (metadata.note) nodes.linkNote.value = metadata.note;
+  }
+  setLinkFetchStatus(metadata.fetched ? "Details added. Review them before saving." : "This site did not provide details. You can add them manually.", metadata.fetched ? "" : "warning");
+  nodes.fetchLinkDetails.disabled = false;
 });
 
 document.querySelectorAll("[data-close-dialog]").forEach((button) => {
@@ -1462,12 +1571,25 @@ document.querySelector("#cancelImportPreview").addEventListener("click", () => {
 
 document.querySelector("#commitImport").addEventListener("click", async () => {
   if (!pendingImportGroups.length) return;
-  await chrome.storage.local.set({ taboraLastImportBackup: structuredClone(appState) });
+  const button = document.querySelector("#commitImport");
   const total = pendingImportGroups.reduce((sum, group) => sum + group.links.length, 0);
+  button.disabled = true;
+  button.textContent = "Fetching details...";
+  const enriched = await enrichLinksWithMetadata(pendingImportGroups.flatMap((group) => group.links));
+  const enrichedByUrl = new Map(enriched.links.map((link) => [normalizeUrl(link.url), link]));
+  pendingImportGroups = pendingImportGroups.map((group) => ({
+    ...group,
+    links: group.links.map((link) => enrichedByUrl.get(normalizeUrl(link.url)) || link)
+  }));
+  await chrome.storage.local.set({ taboraLastImportBackup: structuredClone(appState) });
   for (const group of pendingImportGroups) await addBoard(activePage().id, group.name, group.links);
   pendingImportGroups = [];
   nodes.importDialog.close();
-  await refresh(`${total} links imported`);
+  button.disabled = false;
+  button.textContent = "Import and fetch details";
+  await refresh(enriched.accessGranted
+    ? `${total} links imported${enriched.fetchedCount ? ` · ${enriched.fetchedCount} details fetched` : ""}`
+    : `${total} links imported without fetched details`);
 });
 
 function renderTrash() {
