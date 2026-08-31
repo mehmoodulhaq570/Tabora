@@ -38,7 +38,7 @@ English
 
 | Asset | Dimensions | Status | Filename |
 |-------|-----------|--------|----------|
-| Store Icon | 128x128 PNG | Not created | |
+| Store Icon | 128x128 PNG | Ready | icons/tabora-128.png |
 | Screenshot 1 | 1280x800 or 640x400 | Needs update | |
 | Screenshot 2 | 1280x800 or 640x400 | Needs update | |
 | Screenshot 3 | 1280x800 or 640x400 | Not created | |
@@ -109,6 +109,7 @@ The optional broken-link checker and link-detail fetching send standard HTTP req
 
 | Version | Date | Changes | Status |
 |---------|------|---------|--------|
+| Next release | 2026-08-31 | Added optimized Tabora icon assets for the Chrome toolbar, extension manager, and store listing | Draft |
 | Next release | 2026-08-31 | Added automatic link metadata fetching during dashboard saves and imports with one-time optional site access | Draft |
 | Next release | 2026-08-31 | Added quiet in-layout welcome guidance for creating boards, saving links, and searching the workspace | Draft |
 | 3.0.2 | 2026-08-31 | Removed an unnecessary background permission and hardened service-worker startup across Chromium browsers | Draft |

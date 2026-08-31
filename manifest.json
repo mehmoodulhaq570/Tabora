@@ -3,6 +3,12 @@
   "name": "Tabora",
   "description": "Organize bookmarks into beautiful pages and boards on every new tab.",
   "version": "3.0.2",
+  "icons": {
+    "16": "icons/tabora-16.png",
+    "32": "icons/tabora-32.png",
+    "48": "icons/tabora-48.png",
+    "128": "icons/tabora-128.png"
+  },
   "permissions": ["tabs", "storage", "clipboardWrite"],
   "optional_permissions": ["bookmarks"],
   "optional_host_permissions": ["http://*/*", "https://*/*"],
@@ -11,7 +17,13 @@
   },
   "action": {
     "default_title": "Tabora",
-    "default_popup": "popup.html"
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/tabora-16.png",
+      "32": "icons/tabora-32.png",
+      "48": "icons/tabora-48.png",
+      "128": "icons/tabora-128.png"
+    }
   },
   "background": {
     "service_worker": "background.js"
