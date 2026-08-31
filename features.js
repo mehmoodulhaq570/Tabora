@@ -307,8 +307,7 @@ async function createRoomPackage() {
   const encrypted = await encryptWithPassword({ page, boards, expiresAt: Date.now() + 86_400_000 }, password);
   const packageValue = `TABORA1.${password}.${btoa(JSON.stringify(encrypted))}`;
   featureNodes.roomCode.value = packageValue;
-  await navigator.clipboard.writeText(packageValue);
-  showToast("Room package copied");
+  await copyShareText(packageValue, "Room package copied");
 }
 
 async function joinRoomPackage() {

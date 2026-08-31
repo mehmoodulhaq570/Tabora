@@ -251,7 +251,7 @@ function createLinkRow(board, link) {
 
   const actions = document.createElement("span");
   actions.className = "link-actions";
-  actions.innerHTML = `<button data-edit-link="${link.id}" data-board-id="${board.id}" title="Edit link" aria-label="Edit link"><svg class="link-action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4l11-11-4-4L4 16v4Z"></path><path d="m13.5 6.5 4 4"></path></svg></button><button data-delete-link="${link.id}" data-board-id="${board.id}" title="Delete link" aria-label="Delete link"><svg class="link-action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 14h10l1-14M10 11v6M14 11v6"></path></svg></button>`;
+  actions.innerHTML = `<button data-share-link="${link.id}" data-board-id="${board.id}" title="Copy link" aria-label="Copy link"><svg class="link-action-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="5" r="2.5"></circle><circle cx="6" cy="12" r="2.5"></circle><circle cx="18" cy="19" r="2.5"></circle><path d="m8.3 10.9 7.4-4.4M8.3 13.1l7.4 4.4"></path></svg></button><button data-edit-link="${link.id}" data-board-id="${board.id}" title="Edit link" aria-label="Edit link"><svg class="link-action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4l11-11-4-4L4 16v4Z"></path><path d="m13.5 6.5 4 4"></path></svg></button><button data-delete-link="${link.id}" data-board-id="${board.id}" title="Delete link" aria-label="Delete link"><svg class="link-action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 14h10l1-14M10 11v6M14 11v6"></path></svg></button>`;
   row.append(anchor, actions);
   return row;
 }
@@ -582,22 +582,66 @@ async function openSingleLink(link) {
   }
 }
 
+async function writeClipboardText(text) {
+  const value = String(text || "");
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(value);
+      return;
+    }
+  } catch (error) {
+    console.warn("Clipboard API unavailable, trying document copy", error);
+  }
+
+  const textarea = document.createElement("textarea");
+  textarea.value = value;
+  textarea.setAttribute("readonly", "");
+  textarea.style.position = "fixed";
+  textarea.style.opacity = "0";
+  textarea.style.pointerEvents = "none";
+  document.body.append(textarea);
+  let copied = false;
+  try {
+    textarea.focus();
+    textarea.select();
+    copied = document.execCommand("copy");
+  } finally {
+    textarea.remove();
+  }
+  if (!copied) throw new Error("Clipboard copy failed");
+}
+
+async function copyShareText(text, successMessage) {
+  try {
+    await writeClipboardText(text);
+    showToast(successMessage);
+    return true;
+  } catch (error) {
+    console.error("Could not copy shared content", error);
+    showToast("Could not copy. Check Tabora clipboard permission.", "warning");
+    return false;
+  }
+}
+
+function boardShareText(board) {
+  const links = ordered(board.links).map((link) => `${link.title} | ${link.url}`).join("\n");
+  return `${board.name}\n${links}`.trim();
+}
+
 async function copyBoardLinks(board) {
-  const text = ordered(board.links).map((link) => `${link.title} | ${link.url}`).join("\n");
-  await navigator.clipboard.writeText(text);
-  showToast("Board links copied");
+  await copyShareText(boardShareText(board), "Board links copied");
 }
 
 async function copyPageLinks(page) {
   const boards = appState.boards
     .filter((board) => board.pageId === page.id)
     .sort((a, b) => a.column - b.column || a.columnOrder - b.columnOrder);
-  const text = boards.map((board) => {
-    const links = ordered(board.links).map((link) => `${link.title} | ${link.url}`).join("\n");
-    return `${board.name}\n${links}`.trim();
-  }).join("\n\n");
-  await navigator.clipboard.writeText(text || page.name);
-  showToast("Page links copied");
+  const text = boards.map(boardShareText).join("\n\n");
+  await copyShareText(text || page.name, "Page links copied");
+}
+
+async function copySingleLink(link) {
+  await copyShareText(`${link.title} | ${link.url}`, "Link copied");
 }
 
 function pageMenuItems(page) {
@@ -698,6 +742,7 @@ nodes.boardGrid.addEventListener("click", async (event) => {
   const menuButton = event.target.closest("[data-board-menu]");
   const openButton = event.target.closest("[data-open-board]");
   const linkAnchor = event.target.closest("[data-open-link]");
+  const shareLinkButton = event.target.closest("[data-share-link]");
   const editLinkButton = event.target.closest("[data-edit-link]");
   const deleteLinkButton = event.target.closest("[data-delete-link]");
 
@@ -726,6 +771,11 @@ nodes.boardGrid.addEventListener("click", async (event) => {
     const board = appState.boards.find((item) => item.id === linkAnchor.dataset.boardId);
     const link = board?.links.find((item) => item.id === linkAnchor.dataset.openLink);
     if (link) await openSingleLink(link);
+  }
+  if (shareLinkButton) {
+    const board = appState.boards.find((item) => item.id === shareLinkButton.dataset.boardId);
+    const link = board?.links.find((item) => item.id === shareLinkButton.dataset.shareLink);
+    if (link) await copySingleLink(link);
   }
   if (editLinkButton) {
     const board = appState.boards.find((item) => item.id === editLinkButton.dataset.boardId);

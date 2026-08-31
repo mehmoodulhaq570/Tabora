@@ -3,7 +3,7 @@
   "name": "Tabora",
   "description": "Organize bookmarks into beautiful pages and boards on every new tab.",
   "version": "3.0.0",
-  "permissions": ["tabs", "storage"],
+  "permissions": ["tabs", "storage", "clipboardWrite"],
   "host_permissions": ["http://*/*", "https://*/*"],
   "optional_permissions": ["bookmarks"],
   "chrome_url_overrides": {

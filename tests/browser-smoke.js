@@ -78,6 +78,35 @@ async function waitForTargets() {
   assert.equal(page.tool, true);
   assert.equal(page.horizontalOverflow, false);
 
+  const sharing = await client.evaluate(`(async () => {
+    const page = activePage();
+    let board = appState.boards.find((item) => item.name === "Share Test");
+    if (!board) {
+      const added = await addBoard(page.id, "Share Test", [{ title: "Example", url: "https://example.com" }], { column: 0, order: 0 });
+      board = added.result;
+      await refresh();
+    }
+    const toastText = () => document.querySelector("#toast .toast-copy")?.textContent || "";
+    const chooseMenuItem = async (anchor, label) => {
+      anchor.click();
+      await new Promise((resolve) => setTimeout(resolve, 40));
+      const item = [...document.querySelectorAll("#contextMenu button")].find((button) => button.textContent.trim() === label);
+      if (!item) return "missing";
+      item.click();
+      await new Promise((resolve) => setTimeout(resolve, 140));
+      return toastText();
+    };
+    const pageResult = await chooseMenuItem(document.querySelector('[data-page-options="home"]'), "Share Page");
+    const boardResult = await chooseMenuItem(document.querySelector('[data-board-menu="' + board.id + '"]'), "Share / copy links");
+    document.querySelector('[data-share-link][data-board-id="' + board.id + '"]').click();
+    await new Promise((resolve) => setTimeout(resolve, 140));
+    return { pageResult, boardResult, linkResult: toastText(), shareButton: Boolean(document.querySelector("[data-share-link]")) };
+  })()`);
+  assert.equal(sharing.pageResult, "Page links copied");
+  assert.equal(sharing.boardResult, "Board links copied");
+  assert.equal(sharing.linkResult, "Link copied");
+  assert.equal(sharing.shareButton, true);
+
   const search = await client.evaluate(`(async () => {
     const tool = document.querySelector("#searchTool");
     tool.click();
