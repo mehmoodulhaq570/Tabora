@@ -107,7 +107,7 @@ function renderRecentBoards() {
   for (const board of boards) {
     const row = document.createElement("article");
     row.className = "popup-board-row";
-    row.innerHTML = `<span></span><div class="popup-board-copy"><strong></strong><span></span></div><button class="popup-open-button" data-open-board="${board.id}">Open all</button>`;
+    row.innerHTML = `<span></span><div class="popup-board-copy"><strong></strong><span></span></div><button class="popup-open-button" data-open-board="${board.id}"><svg class="popup-button-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6M20 4 11 13"></path><path d="M18 13v6a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h6"></path></svg>Open all</button>`;
     setText(row, "strong", board.name);
     const page = popupState.pages.find((item) => item.id === board.pageId);
     setText(row, ".popup-board-copy span", `${page?.name || "Home"} · ${board.links.length} links`);
