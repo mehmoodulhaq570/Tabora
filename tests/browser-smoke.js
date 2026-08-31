@@ -78,6 +78,45 @@ async function waitForTargets() {
   assert.equal(page.tool, true);
   assert.equal(page.horizontalOverflow, false);
 
+  const manifest = await client.evaluate(`chrome.runtime.getManifest()`);
+  assert.equal(manifest.manifest_version, 3);
+  assert.ok(manifest.permissions.includes("alarms"));
+  assert.equal(manifest.host_permissions, undefined);
+  assert.deepEqual(manifest.optional_host_permissions, ["http://*/*", "https://*/*"]);
+
+  const accessibility = await client.evaluate(`(() => {
+    const dialogs = [...document.querySelectorAll("dialog")];
+    const namedDialogs = dialogs.every((dialog) => {
+      const labelId = dialog.getAttribute("aria-labelledby");
+      return Boolean(labelId && document.getElementById(labelId)?.textContent.trim());
+    });
+    const trigger = document.querySelector('[data-page-options="home"]');
+    trigger.click();
+    const menu = document.querySelector("#contextMenu");
+    const items = [...menu.querySelectorAll('[role="menuitem"]')];
+    const firstLabel = document.activeElement?.textContent.trim();
+    menu.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
+    const secondLabel = document.activeElement?.textContent.trim();
+    menu.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    return {
+      namedDialogs,
+      menuRole: menu.getAttribute("role"),
+      itemCount: items.length,
+      firstLabel,
+      secondLabel,
+      menuClosed: menu.hidden,
+      focusRestored: document.activeElement === trigger,
+      expanded: trigger.getAttribute("aria-expanded")
+    };
+  })()`);
+  assert.equal(accessibility.namedDialogs, true);
+  assert.equal(accessibility.menuRole, "menu");
+  assert.ok(accessibility.itemCount >= 2);
+  assert.notEqual(accessibility.firstLabel, accessibility.secondLabel);
+  assert.equal(accessibility.menuClosed, true);
+  assert.equal(accessibility.focusRestored, true);
+  assert.equal(accessibility.expanded, "false");
+
   const sharing = await client.evaluate(`(async () => {
     const page = activePage();
     let board = appState.boards.find((item) => item.name === "Share Test");
@@ -233,6 +272,23 @@ async function waitForTargets() {
   assert.equal(hub.views, 7);
   assert.equal(hub.clipped, false);
   assert.ok(hub.width > 700 && hub.height > 500);
+
+  const persistenceId = await client.evaluate(`(async () => {
+    let board = appState.boards.find((item) => item.name === "Persistence Test");
+    if (!board) {
+      const added = await addBoard(activePage().id, "Persistence Test", [{ title: "Persistent Example", url: "https://example.com/persist" }]);
+      board = added.result;
+    }
+    return board.id;
+  })()`);
+  await client.send("Page.reload", { ignoreCache: true });
+  await new Promise((resolve) => setTimeout(resolve, 1600));
+  const persisted = await client.evaluate(`(async () => {
+    const state = await getTaboraState();
+    const board = state.boards.find((item) => item.id === ${JSON.stringify(persistenceId)});
+    return Boolean(board && board.links.some((link) => link.url === "https://example.com/persist"));
+  })()`);
+  assert.equal(persisted, true);
 
   const exceptions = client.events.filter((event) => event.method === "Runtime.exceptionThrown");
   assert.equal(exceptions.length, 0, exceptions.map((event) => event.params.exceptionDetails.text).join("\n"));

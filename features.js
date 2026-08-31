@@ -378,7 +378,19 @@ document.querySelector("#featureUndo").addEventListener("click", async () => {
   await applyAppearance();
 });
 
-document.querySelector("#checkLinks").addEventListener("click", checkAllLinks);
+document.querySelector("#checkLinks").addEventListener("click", async () => {
+  try {
+    const granted = await chrome.permissions.request({ origins: ["http://*/*", "https://*/*"] });
+    if (!granted) {
+      showToast("Site access is required to check bookmark health", "warning");
+      return;
+    }
+    await checkAllLinks();
+  } catch (error) {
+    console.error("Tabora link permission request failed", error);
+    showToast("Could not request site access", "warning");
+  }
+});
 document.querySelector("#smartOrganize").addEventListener("click", smartOrganizeCurrentPage);
 
 document.querySelector("#moodForm").addEventListener("submit", async (event) => {

@@ -49,6 +49,7 @@ let organizeSnapshot = null;
 let organizeDropTarget = null;
 const selectedOrganizeLinks = new Set();
 let deleteConfirmationResolve = null;
+let contextMenuTrigger = null;
 
 const ORGANIZE_TOOL_ICON = '<svg class="rail-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="6" height="6" rx="1"></rect><rect x="14" y="3" width="6" height="6" rx="1"></rect><rect x="3" y="14" width="6" height="6" rx="1"></rect><path d="m13.5 17 2.2 2.2 4.8-5"></path></svg>';
 const ORGANIZE_DONE_ICON = '<svg class="rail-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4.5 4.5L19 7"></path></svg>';
@@ -132,6 +133,9 @@ function renderPages() {
     options.dataset.pageOptions = page.id;
     options.title = `${page.name} options`;
     options.setAttribute("aria-label", `${page.name} options`);
+    options.setAttribute("aria-haspopup", "menu");
+    options.setAttribute("aria-controls", "contextMenu");
+    options.setAttribute("aria-expanded", "false");
     options.innerHTML = '<svg class="page-chevron-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m8 10 4 4 4-4"></path></svg>';
     item.append(button, options);
     nodes.pageTabs.append(item);
@@ -190,7 +194,7 @@ function createBoardCard(board, query) {
     <div class="board-title"><svg class="drag-grip" viewBox="0 0 18 18" aria-hidden="true"><circle cx="5" cy="4" r="1"></circle><circle cx="13" cy="4" r="1"></circle><circle cx="5" cy="9" r="1"></circle><circle cx="13" cy="9" r="1"></circle><circle cx="5" cy="14" r="1"></circle><circle cx="13" cy="14" r="1"></circle></svg><span class="board-symbol">${BOARD_ICONS[board.icon] || BOARD_ICONS.folder}</span><h2></h2><span class="board-pin" aria-label="Pinned">${board.pinned ? "Pinned" : ""}</span></div>
     <div class="board-actions">
       <button class="board-icon-button" data-add-link="${board.id}" title="Add link" aria-label="Add link"><svg class="board-action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13a4.5 4.5 0 0 0 6.4.1l2-2a4.5 4.5 0 0 0-6.3-6.4l-1.2 1.2"></path><path d="M14 11a4.5 4.5 0 0 0-6.4-.1l-2 2a4.5 4.5 0 0 0 6.3 6.4l1.2-1.2"></path><path class="icon-accent" d="M19 16v5M16.5 18.5h5"></path></svg></button>
-      <button class="board-icon-button" data-board-menu="${board.id}" title="Board options" aria-label="Board options"><svg class="board-action-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg></button>
+      <button class="board-icon-button" data-board-menu="${board.id}" title="Board options" aria-label="Board options" aria-haspopup="menu" aria-controls="contextMenu" aria-expanded="false"><svg class="board-action-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg></button>
     </div>`;
   setText(header, "h2", board.name);
   card.append(header);
@@ -509,7 +513,19 @@ function closeDialog(id) {
   document.querySelector(`#${id}`)?.close();
 }
 
+function hideContextMenu({ restoreFocus = false } = {}) {
+  nodes.contextMenu.hidden = true;
+  if (contextMenuTrigger) {
+    contextMenuTrigger.setAttribute("aria-expanded", "false");
+    if (restoreFocus && contextMenuTrigger.isConnected) contextMenuTrigger.focus();
+  }
+  contextMenuTrigger = null;
+}
+
 function showContextMenu(anchor, items) {
+  hideContextMenu();
+  contextMenuTrigger = anchor;
+  if (anchor.matches("[data-board-menu], [data-page-options]")) anchor.setAttribute("aria-expanded", "true");
   nodes.contextMenu.innerHTML = "";
   for (const item of items) {
     if (item.separator) {
@@ -518,10 +534,12 @@ function showContextMenu(anchor, items) {
     }
     const button = document.createElement("button");
     button.className = item.danger ? "danger-menu-item" : "";
+    button.setAttribute("role", "menuitem");
+    button.tabIndex = -1;
     button.innerHTML = `<span>${item.icon || ""}</span><span></span>`;
     setText(button, "span:last-child", item.label);
     button.addEventListener("click", async () => {
-      nodes.contextMenu.hidden = true;
+      hideContextMenu();
       await item.action();
     });
     nodes.contextMenu.append(button);
@@ -531,7 +549,35 @@ function showContextMenu(anchor, items) {
   const width = 230;
   nodes.contextMenu.style.left = `${Math.min(rect.left, window.innerWidth - width - 16)}px`;
   nodes.contextMenu.style.top = `${Math.min(rect.bottom + 6, window.innerHeight - nodes.contextMenu.offsetHeight - 16)}px`;
+  const firstItem = nodes.contextMenu.querySelector('[role="menuitem"]');
+  if (firstItem) {
+    firstItem.tabIndex = 0;
+    firstItem.focus({ preventScroll: true });
+  }
 }
+
+nodes.contextMenu.addEventListener("keydown", (event) => {
+  const items = [...nodes.contextMenu.querySelectorAll('[role="menuitem"]')];
+  if (!items.length) return;
+  const currentIndex = Math.max(0, items.indexOf(document.activeElement));
+  let nextIndex = currentIndex;
+  if (event.key === "ArrowDown") nextIndex = (currentIndex + 1) % items.length;
+  else if (event.key === "ArrowUp") nextIndex = (currentIndex - 1 + items.length) % items.length;
+  else if (event.key === "Home") nextIndex = 0;
+  else if (event.key === "End") nextIndex = items.length - 1;
+  else if (event.key === "Escape") {
+    event.preventDefault();
+    hideContextMenu({ restoreFocus: true });
+    return;
+  } else if (event.key === "Tab") {
+    hideContextMenu();
+    return;
+  } else return;
+
+  event.preventDefault();
+  items.forEach((item, index) => { item.tabIndex = index === nextIndex ? 0 : -1; });
+  items[nextIndex].focus();
+});
 
 function boardMenuItems(board) {
   const items = [
@@ -858,7 +904,7 @@ function syncSearchState() {
 
 function openSearch() {
   closeAppearancePanel();
-  nodes.contextMenu.hidden = true;
+  hideContextMenu();
   nodes.searchPanel.hidden = false;
   syncSearchState();
   nodes.globalSearch.focus({ preventScroll: true });
@@ -1658,11 +1704,12 @@ async function applyAppearance() {
 
 document.querySelector("#skipOnboarding").addEventListener("click", async () => { await setSetting("onboardingComplete", true); await refresh(); });
 document.addEventListener("click", (event) => {
-  if (!event.target.closest("#contextMenu") && !event.target.closest("[data-board-menu]") && !event.target.closest("[data-page-options]")) nodes.contextMenu.hidden = true;
+  if (!event.target.closest("#contextMenu") && !event.target.closest("[data-board-menu]") && !event.target.closest("[data-page-options]")) hideContextMenu();
   if (!event.target.closest("#appearancePanel") && !event.target.closest("#wallpaperTool")) closeAppearancePanel();
   if (!event.target.closest("#searchPanel") && !event.target.closest("#searchTool")) closeSearch();
 });
 document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && !nodes.contextMenu.hidden) { event.preventDefault(); hideContextMenu({ restoreFocus: true }); return; }
   if (event.key === "Escape" && !nodes.searchPanel.hidden) { event.preventDefault(); closeSearch(); return; }
   if (event.key === "/" && !event.target.matches("input, textarea")) { event.preventDefault(); openSearch(); }
 });
