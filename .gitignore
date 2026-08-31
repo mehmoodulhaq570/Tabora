@@ -1,3 +1,44 @@
-.font-temp/
+# Local agent and temporary font tooling
 .agents/
 skills-lock.json
+.font-temp/
+
+# Dependencies and generated extension packages
+node_modules/
+dist/
+build/
+web-ext-artifacts/
+*.crx
+*.pem
+
+# Local browser and test output
+.chrome-profile/
+.browser-profile/
+coverage/
+playwright-report/
+test-results/
+artifacts/
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+
+# Logs and temporary files
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.cache/
+tmp/
+temp/
+*.tmp
+
+# Editor and operating-system metadata
+.vscode/
+.idea/
+*.code-workspace
+.DS_Store
+Thumbs.db
+Desktop.ini

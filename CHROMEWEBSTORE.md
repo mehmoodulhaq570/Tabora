@@ -57,7 +57,6 @@ English
 | `tabs` | permissions | Reads titles and addresses of tabs the user explicitly saves, creates tabs when opening saved links, and optionally closes tabs after saving a window. |
 | `storage` | permissions | Stores pages, boards, links, settings, trash recovery data, and undo state locally in the browser profile. |
 | `clipboardWrite` | permissions | Copies a link, board, page, or encrypted temporary room package when the user chooses a share or copy action. |
-| `alarms` | permissions | Reliably clears temporary quick-save badge and tooltip feedback from the extension toolbar in a Manifest V3 service worker. |
 | `bookmarks` | optional_permissions | Imports browser bookmarks only after the user selects Browser bookmarks and approves access. |
 | `http://*/*`, `https://*/*` | optional_host_permissions | Checks saved links for availability and redirects only after the user starts Check Links and grants site access. |
 
@@ -109,7 +108,8 @@ The optional broken-link checker sends standard HTTP requests directly from the 
 
 | Version | Date | Changes | Status |
 |---------|------|---------|--------|
-| 3.0.1 | 2026-08-31 | MV3 reliability, optional site access, accessibility, and store-readiness hardening | Draft |
+| 3.0.2 | 2026-08-31 | Removed an unnecessary background permission and hardened service-worker startup across Chromium browsers | Draft |
+| 3.0.1 | 2026-08-31 | MV3 reliability, optional site access, accessibility, consistent local typography, and theme-aware toolbar popup styling | Draft |
 
 ## Review Notes
 

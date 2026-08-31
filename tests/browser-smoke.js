@@ -6,6 +6,7 @@ const screenshotPath = process.env.TABORA_SCREENSHOT || "";
 const searchScreenshotPath = process.env.TABORA_SEARCH_SCREENSHOT || "";
 const lightMenuScreenshotPath = process.env.TABORA_LIGHT_MENU_SCREENSHOT || "";
 const lightDialogScreenshotPath = process.env.TABORA_LIGHT_DIALOG_SCREENSHOT || "";
+const popupScreenshotPath = process.env.TABORA_POPUP_SCREENSHOT || "";
 
 class CdpClient {
   constructor(url) {
@@ -80,7 +81,7 @@ async function waitForTargets() {
 
   const manifest = await client.evaluate(`chrome.runtime.getManifest()`);
   assert.equal(manifest.manifest_version, 3);
-  assert.ok(manifest.permissions.includes("alarms"));
+  assert.ok(!manifest.permissions.includes("alarms"));
   assert.equal(manifest.host_permissions, undefined);
   assert.deepEqual(manifest.optional_host_permissions, ["http://*/*", "https://*/*"]);
 
@@ -290,13 +291,55 @@ async function waitForTargets() {
   })()`);
   assert.equal(persisted, true);
 
-  const exceptions = client.events.filter((event) => event.method === "Runtime.exceptionThrown");
-  assert.equal(exceptions.length, 0, exceptions.map((event) => event.params.exceptionDetails.text).join("\n"));
-
   if (screenshotPath) {
     const screenshot = await client.send("Page.captureScreenshot", { format: "png", captureBeyondViewport: false });
     fs.writeFileSync(screenshotPath, Buffer.from(screenshot.data, "base64"));
   }
+
+  const popupUrl = new URL("popup.html", page.url).href;
+  await client.send("Page.navigate", { url: popupUrl });
+  await new Promise((resolve) => setTimeout(resolve, 800));
+  const lightPopup = await client.evaluate(`({
+    palette: document.body.dataset.palette,
+    light: document.body.classList.contains("light-theme"),
+    wallpaper: getComputedStyle(document.body).backgroundImage,
+    font: getComputedStyle(document.body).fontFamily,
+    fontLoaded: document.fonts.check('14px "Nunito Sans"'),
+    horizontalOverflow: document.documentElement.scrollWidth > innerWidth
+  })`);
+  assert.equal(lightPopup.palette, "sakura");
+  assert.equal(lightPopup.light, true);
+  assert.match(lightPopup.wallpaper, /sakura-drift\.webp/);
+  assert.match(lightPopup.font, /Nunito Sans/);
+  assert.equal(lightPopup.fontLoaded, true);
+  assert.equal(lightPopup.horizontalOverflow, false);
+
+  if (popupScreenshotPath) {
+    const screenshot = await client.send("Page.captureScreenshot", { format: "png", captureBeyondViewport: false });
+    fs.writeFileSync(popupScreenshotPath, Buffer.from(screenshot.data, "base64"));
+  }
+
+  await client.evaluate(`(async () => {
+    await setSetting("theme", "dark");
+    await setSetting("wallpaper", "digital-ocean");
+  })()`);
+  await new Promise((resolve) => setTimeout(resolve, 500));
+  const darkPopup = await client.evaluate(`({
+    palette: document.body.dataset.palette,
+    light: document.body.classList.contains("light-theme"),
+    wallpaper: getComputedStyle(document.body).backgroundImage
+  })`);
+  assert.equal(darkPopup.palette, "forest");
+  assert.equal(darkPopup.light, false);
+  assert.match(darkPopup.wallpaper, /tabora-background\.png/);
+
+  await client.evaluate(`(async () => {
+    await setSetting("theme", "light");
+    await setSetting("wallpaper", "sakura-drift");
+  })()`);
+
+  const exceptions = client.events.filter((event) => event.method === "Runtime.exceptionThrown");
+  assert.equal(exceptions.length, 0, exceptions.map((event) => event.params.exceptionDetails.text).join("\n"));
   client.close();
   console.log(`browser smoke test passed (${page.url}, ${hub.width}x${hub.height})`);
 })().catch((error) => {

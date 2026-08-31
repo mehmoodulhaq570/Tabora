@@ -6,6 +6,24 @@ const recentBoards = document.querySelector("#recentBoards");
 const popupStatus = document.querySelector("#popupStatus");
 
 let popupState = createDefaultState();
+let popupWallpaperUrl = "";
+
+const POPUP_APPEARANCES = {
+  "digital-ocean": ["forest", "assets/tabora-background.png"],
+  "crimson-realm": ["crimson", "assets/crimson-realm.png"],
+  "aurora-station": ["aurora", "assets/aurora-station.webp"],
+  "moonlit-garden": ["garden", "assets/moonlit-garden.webp"],
+  "eclipse-forge": ["eclipse", "assets/eclipse-forge.webp"],
+  "abyss-bloom": ["abyss", "assets/abyss-bloom.webp"],
+  "neon-monsoon": ["monsoon", "assets/neon-monsoon.webp"],
+  "mist-valley": ["mist", "assets/mist-valley.png"],
+  "amber-voyager": ["amber", "assets/amber-voyager.png"],
+  "alpine-clear": ["alpine", "assets/alpine-clear.webp"],
+  "coral-coast": ["coast", "assets/coral-coast.webp"],
+  "glass-horizon": ["glass", "assets/glass-horizon.webp"],
+  "sakura-drift": ["sakura", "assets/sakura-drift.webp"],
+  "arctic-prism": ["arctic", "assets/arctic-prism.webp"]
+};
 
 function showPopupStatus(message, warning = false) {
   popupStatus.textContent = message;
@@ -16,8 +34,35 @@ function showPopupStatus(message, warning = false) {
 
 async function initPopup() {
   popupState = await getTaboraState();
+  await applyPopupAppearance();
   renderSelectors();
   renderRecentBoards();
+}
+
+async function applyPopupAppearance() {
+  const { theme, wallpaper } = popupState.settings;
+  const appearance = POPUP_APPEARANCES[wallpaper];
+  document.body.classList.toggle("light-theme", theme === "light");
+  document.body.dataset.palette = appearance?.[0] || `${theme}-default`;
+
+  if (popupWallpaperUrl) {
+    URL.revokeObjectURL(popupWallpaperUrl);
+    popupWallpaperUrl = "";
+  }
+
+  let image = appearance?.[1] ? chrome.runtime.getURL(appearance[1]) : "";
+  if (wallpaper.startsWith("custom")) {
+    try {
+      const blob = await getWallpaperBlob(wallpaper);
+      if (blob) {
+        popupWallpaperUrl = URL.createObjectURL(blob);
+        image = popupWallpaperUrl;
+      }
+    } catch {
+      image = "";
+    }
+  }
+  document.body.style.setProperty("--popup-wallpaper", image ? `url("${image}")` : "none");
 }
 
 function renderSelectors() {

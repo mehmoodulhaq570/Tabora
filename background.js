@@ -1,16 +1,8 @@
-const V2_KEY = "taboraV2";
-const ACTION_RESET_ALARM = "tabora-reset-action-feedback";
+/* global chrome, importScripts, normalizeUrl, getTaboraState, findDuplicateLink, addBoard, addLink */
+
 const DEFAULT_ACTION_TITLE = "Tabora";
 
 importScripts("shared.js");
-
-async function initializeStorage() {
-  const data = await chrome.storage.local.get(V2_KEY);
-  if (data[V2_KEY]) return;
-
-  // The full V1 migration runs in shared.js when the new-tab page first opens.
-  await chrome.storage.local.set({ taboraNeedsMigration: true });
-}
 
 async function resetActionFeedback() {
   await Promise.all([
@@ -19,14 +11,26 @@ async function resetActionFeedback() {
   ]);
 }
 
+function isWorkerShutdownError(error) {
+  const message = error instanceof Error ? error.message : String(error || "");
+  return /\bNo SW\b|Extension context invalidated/i.test(message);
+}
+
+function resetActionFeedbackLater() {
+  setTimeout(() => {
+    void resetActionFeedback().catch((error) => {
+      if (!isWorkerShutdownError(error)) console.error("Tabora action feedback reset failed", error);
+    });
+  }, 3000);
+}
+
 async function showActionFeedback(text, title, color) {
   await Promise.all([
     chrome.action.setBadgeBackgroundColor({ color }),
     chrome.action.setBadgeText({ text }),
     chrome.action.setTitle({ title })
   ]);
-  await chrome.alarms.clear(ACTION_RESET_ALARM);
-  await chrome.alarms.create(ACTION_RESET_ALARM, { when: Date.now() + 3000 });
+  resetActionFeedbackLater();
 }
 
 async function handleQuickSave(command) {
@@ -55,10 +59,6 @@ async function handleQuickSave(command) {
   }
 }
 
-chrome.runtime.onInstalled.addListener(() => {
-  void initializeStorage().catch((error) => console.error("Tabora installation setup failed", error));
-});
-
 chrome.commands.onCommand.addListener((command) => {
   void handleQuickSave(command).catch(async (error) => {
     console.error("Tabora quick save failed", error);
@@ -68,9 +68,4 @@ chrome.commands.onCommand.addListener((command) => {
       console.error("Tabora could not display quick-save feedback", feedbackError);
     }
   });
-});
-
-chrome.alarms.onAlarm.addListener((alarm) => {
-  if (alarm.name !== ACTION_RESET_ALARM) return;
-  void resetActionFeedback().catch((error) => console.error("Tabora action feedback reset failed", error));
 });
